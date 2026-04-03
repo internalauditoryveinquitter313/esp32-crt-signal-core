@@ -1,6 +1,8 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0a0a0a,50:1a1a2e,100:2d1b69&height=200&section=header&text=CRT%20Signal%20Core&fontSize=55&fontColor=00ff41&animation=twinkling&fontAlignY=35&desc=Deterministic%20Composite%20Video%20Engine%20for%20ESP32&descSize=16&descAlignY=55&descColor=aaa" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:08090d,50:34131f,100:153222&height=200&section=header&text=CRT%20Signal%20Core&fontSize=55&fontColor=b8ff6a&animation=twinkling&fontAlignY=35&desc=Deterministic%20Composite%20Video%20Engine%20for%20ESP32&descSize=16&descAlignY=55&descColor=e5e7eb" width="100%"/>
+
+<img src="./.github/assets/television.png" alt="Retro CRT television icon" width="72"/>
 
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-5.4+-C11?style=for-the-badge&logo=espressif&logoColor=fff)](https://docs.espressif.com/projects/esp-idf/)
 [![C](https://img.shields.io/badge/C11-Embedded-555?style=for-the-badge&logo=c&logoColor=fff)](https://en.wikipedia.org/wiki/C11_(C_standard_revision))
@@ -59,14 +61,14 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
-  'background': '#0f172a',
+  'background': '#0b0d12',
   'primaryTextColor': '#f8fafc',
-  'primaryBorderColor': '#cbd5e1',
-  'lineColor': '#94a3b8',
-  'secondaryColor': '#111827',
-  'tertiaryColor': '#0b1220',
-  'clusterBkg': '#111827',
-  'clusterBorder': '#475569',
+  'primaryBorderColor': '#c7d2fe',
+  'lineColor': '#9be564',
+  'secondaryColor': '#160f14',
+  'tertiaryColor': '#10161f',
+  'clusterBkg': '#10161f',
+  'clusterBorder': '#7f1d1d',
   'fontFamily': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
 }}}%%
 flowchart LR
@@ -94,10 +96,10 @@ flowchart LR
 
     ISR["EOF ISR<br/>Recycle Slots"] -.-> RING
 
-    classDef stage fill:#14532d,stroke:#86efac,color:#f8fafc,stroke-width:2px;
-    classDef dma fill:#1d4ed8,stroke:#93c5fd,color:#f8fafc,stroke-width:2px;
-    classDef hw fill:#7c2d12,stroke:#fdba74,color:#f8fafc,stroke-width:2px;
-    classDef note fill:#3f3f46,stroke:#d4d4d8,color:#f8fafc,stroke-width:2px;
+    classDef stage fill:#16351f,stroke:#b8ff6a,color:#f8fafc,stroke-width:2px;
+    classDef dma fill:#1c2230,stroke:#a5b4fc,color:#f8fafc,stroke-width:2px;
+    classDef hw fill:#5b1720,stroke:#fb7185,color:#f8fafc,stroke-width:2px;
+    classDef note fill:#33252b,stroke:#d4d4d8,color:#f8fafc,stroke-width:2px;
 
     class BLANK,SYNC,BURST,ACTIVE stage;
     class RING dma;
@@ -109,16 +111,16 @@ flowchart LR
 
 ## 📦 Components
 
-| Component | Role | Key Constraint |
-|:----------|:-----|:---------------|
-| **`crt_core`** | Engine — orchestrates the pipeline | No alloc after `start()` |
-| **`crt_hal`** | I2S0 + DAC hardware abstraction | GPIO25 only, internal SRAM DMA |
-| **`crt_timing`** | NTSC/PAL timing profiles | µs-precise blanking/sync tables |
-| **`crt_waveform`** | Burst & chroma synthesis | 3.579545 MHz NTSC colorburst |
-| **`crt_line_policy`** | Per-line type decisions | VBI, sync, active classification |
-| **`crt_demo`** | Test pattern generator | Color bars, ramps, grids |
-| **`crt_diag`** | Runtime telemetry | Late line detection, ISR stats |
-| **`crt_fb`** | Framebuffer stub | Future: external pixel source |
+| Component             | Role                               | Key Constraint                   |
+|:----------------------|:-----------------------------------|:---------------------------------|
+| **`crt_core`**        | Engine — orchestrates the pipeline | No alloc after `start()`         |
+| **`crt_hal`**         | I2S0 + DAC hardware abstraction    | GPIO25 only, internal SRAM DMA   |
+| **`crt_timing`**      | NTSC/PAL timing profiles           | µs-precise blanking/sync tables  |
+| **`crt_waveform`**    | Burst & chroma synthesis           | 3.579545 MHz NTSC colorburst     |
+| **`crt_line_policy`** | Per-line type decisions            | VBI, sync, active classification |
+| **`crt_demo`**        | Test pattern generator             | Color bars, ramps, grids         |
+| **`crt_diag`**        | Runtime telemetry                  | Late line detection, ISR stats   |
+| **`crt_fb`**          | Framebuffer stub                   | Future: external pixel source    |
 
 ---
 
@@ -128,14 +130,14 @@ Each scanline passes through deterministic stages with a strict contract:
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
-  'background': '#0f172a',
+  'background': '#0b0d12',
   'primaryTextColor': '#f8fafc',
-  'primaryBorderColor': '#cbd5e1',
-  'lineColor': '#94a3b8',
-  'secondaryColor': '#111827',
-  'tertiaryColor': '#0b1220',
-  'clusterBkg': '#111827',
-  'clusterBorder': '#475569',
+  'primaryBorderColor': '#c7d2fe',
+  'lineColor': '#9be564',
+  'secondaryColor': '#160f14',
+  'tertiaryColor': '#10161f',
+  'clusterBkg': '#10161f',
+  'clusterBorder': '#7f1d1d',
   'fontFamily': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
 }}}%%
 flowchart LR
@@ -152,10 +154,10 @@ flowchart LR
     RULES -.-> ACTIVE_STAGE
     SHED["If timing slips:<br/>shed optional stages, preserve sync"] -.-> ACTIVE_STAGE
 
-    classDef queue fill:#1d4ed8,stroke:#93c5fd,color:#f8fafc,stroke-width:2px;
-    classDef stage fill:#14532d,stroke:#86efac,color:#f8fafc,stroke-width:2px;
-    classDef rule fill:#3f3f46,stroke:#d4d4d8,color:#f8fafc,stroke-width:2px;
-    classDef output fill:#7c2d12,stroke:#fdba74,color:#f8fafc,stroke-width:2px;
+    classDef queue fill:#1c2230,stroke:#a5b4fc,color:#f8fafc,stroke-width:2px;
+    classDef stage fill:#16351f,stroke:#b8ff6a,color:#f8fafc,stroke-width:2px;
+    classDef rule fill:#33252b,stroke:#d4d4d8,color:#f8fafc,stroke-width:2px;
+    classDef output fill:#5b1720,stroke:#fb7185,color:#f8fafc,stroke-width:2px;
 
     class SLOT_IN,SLOT_OUT queue;
     class BLANK_STAGE,SYNC_STAGE,BURST_STAGE,ACTIVE_STAGE stage;
@@ -172,17 +174,17 @@ flowchart LR
 
 ## 📐 Timing Reference
 
-| Parameter | NTSC | PAL |
-|:----------|-----:|----:|
-| **Line period** | 63.556 µs | 64.000 µs |
-| **H-sync** | 4.7 µs | 4.7 µs |
-| **Front porch** | 1.5 µs | 1.65 µs |
-| **Back porch** | 4.7 µs | 5.7 µs |
-| **Color burst** | 2.5 µs (9 cycles) | 2.25 µs (10 cycles) |
-| **Active video** | 52.6 µs | 51.95 µs |
-| **Burst freq** | 3.579545 MHz | 4.43361875 MHz |
-| **Total lines** | 525 (262.5/field) | 625 (312.5/field) |
-| **Field rate** | 59.94 Hz | 50.00 Hz |
+| Parameter        |              NTSC |                 PAL |
+|:-----------------|------------------:|--------------------:|
+| **Line period**  |         63.556 µs |           64.000 µs |
+| **H-sync**       |            4.7 µs |              4.7 µs |
+| **Front porch**  |            1.5 µs |             1.65 µs |
+| **Back porch**   |            4.7 µs |              5.7 µs |
+| **Color burst**  | 2.5 µs (9 cycles) | 2.25 µs (10 cycles) |
+| **Active video** |           52.6 µs |            51.95 µs |
+| **Burst freq**   |      3.579545 MHz |      4.43361875 MHz |
+| **Total lines**  | 525 (262.5/field) |   625 (312.5/field) |
+| **Field rate**   |          59.94 Hz |            50.00 Hz |
 
 ---
 
@@ -227,12 +229,12 @@ esp32-crt-signal-core/
 <details>
 <summary><strong>📋 Prerequisites</strong></summary>
 
-| Tool | Version |
-|:-----|:--------|
-| ESP-IDF | `>= 5.4` |
-| CMake | `>= 3.16` |
+| Tool       | Version                   |
+|:-----------|:--------------------------|
+| ESP-IDF    | `>= 5.4`                  |
+| CMake      | `>= 3.16`                 |
 | GCC (host) | For running tests locally |
-| Target SoC | ESP32-D0WD-V3 |
+| Target SoC | ESP32-D0WD-V3             |
 
 </details>
 
@@ -281,16 +283,16 @@ gcc -I components/crt_core/include -I components/crt_timing/include \
 
 ## 📊 Stats
 
-| Metric | Value |
-|:-------|------:|
-| **C source files** | 8 |
-| **Header files** | 8 |
-| **Test suites** | 4 |
-| **Total lines** | 1,676 |
-| **Components** | 6 |
-| **DMA channels** | I2S0 continuous |
-| **DAC resolution** | 8-bit |
-| **Output pin** | GPIO25 |
+| Metric             |           Value |
+|:-------------------|----------------:|
+| **C source files** |               8 |
+| **Header files**   |               8 |
+| **Test suites**    |               4 |
+| **Total lines**    |           1,676 |
+| **Components**     |               6 |
+| **DMA channels**   | I2S0 continuous |
+| **DAC resolution** |           8-bit |
+| **Output pin**     |          GPIO25 |
 
 ---
 
