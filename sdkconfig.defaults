@@ -1,0 +1,23 @@
+# ESP32 CRT Signal Core — sdkconfig overrides
+# Only non-default values go here. Everything else uses ESP-IDF defaults.
+# Run `idf.py menuconfig` to explore, then extract changes here.
+
+# ── CPU ──────────────────────────────────────────────────────────────
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
+
+# ── Flash ────────────────────────────────────────────────────────────
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+CONFIG_ESPTOOLPY_FLASHFREQ="40m"
+CONFIG_ESPTOOLPY_FLASHMODE="dio"
+
+# ── FreeRTOS ─────────────────────────────────────────────────────────
+CONFIG_FREERTOS_HZ=1000
+
+# ── Watchdog — prep task on Core 1 can be tight ─────────────────────
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+
+# ── Compiler ─────────────────────────────────────────────────────────
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# ── Log level ────────────────────────────────────────────────────────
+CONFIG_LOG_DEFAULT_LEVEL=3
