@@ -132,6 +132,33 @@ static uint8_t crt_demo_pixel_for_sample(size_t sample_index, size_t sample_coun
     return row[pixel_index < CRT_DEMO_PATTERN_LOGICAL_WIDTH ? pixel_index : (CRT_DEMO_PATTERN_LOGICAL_WIDTH - 1U)];
 }
 
+static bool crt_demo_marker_pixel_for_standard(crt_video_standard_t standard, uint16_t active_line_index, size_t pixel_index)
+{
+    static const uint8_t k_glyph_n[7] = {
+        0x11U, 0x19U, 0x15U, 0x13U, 0x11U, 0x11U, 0x11U,
+    };
+    static const uint8_t k_glyph_p[7] = {
+        0x1eU, 0x11U, 0x11U, 0x1eU, 0x10U, 0x10U, 0x10U,
+    };
+    const uint8_t *glyph = (standard == CRT_VIDEO_STANDARD_PAL) ? k_glyph_p : k_glyph_n;
+    const uint16_t y_scale = 2U;
+    const uint16_t x_scale = 2U;
+    const uint16_t glyph_h = 7U * y_scale;
+    const uint16_t glyph_w = 5U * x_scale;
+    const uint16_t x0 = 8U;
+
+    if (active_line_index >= glyph_h) {
+        return false;
+    }
+    if (pixel_index < x0 || pixel_index >= (size_t)(x0 + glyph_w)) {
+        return false;
+    }
+
+    const uint16_t row = active_line_index / y_scale;
+    const uint16_t col = (uint16_t)(pixel_index - x0) / x_scale;
+    return (glyph[row] & (uint8_t)(1U << (4U - col))) != 0U;
+}
+
 void crt_demo_pattern_build_color_bars_row(uint8_t *pixels, size_t width)
 {
     const size_t bar_count = 8U;
@@ -197,16 +224,22 @@ void crt_demo_pattern_render_active_window(const crt_demo_pattern_runtime_t *run
             crt_demo_pattern_render_luma_bars(runtime, samples, sample_count);
         }
     } else {
-        /* DEBUG: solid cyan — entire active area */
-        uint32_t cyan = 0x44323042U;
-        uint8_t phases[4] = {
-            (uint8_t)((cyan >> 24) & 0xFF),
-            (uint8_t)((cyan >> 16) & 0xFF),
-            (uint8_t)((cyan >> 8) & 0xFF),
-            (uint8_t)(cyan & 0xFF),
-        };
-        for (size_t i = 0; i < sample_count; ++i) {
-            samples[i] = (uint16_t)(phases[i & 3U] << 8);
+        if (ramp_region) {
+            for (size_t i = 0; i < sample_count; ++i) {
+                const uint8_t pixel = crt_demo_pixel_for_sample(i, sample_count, runtime->grayscale_ramp_row);
+                const uint32_t level = CRT_DEMO_LUMA_BLACK +
+                                       (((uint32_t)(CRT_DEMO_LUMA_WHITE - CRT_DEMO_LUMA_BLACK) * pixel) / 255U);
+                samples[i] = (uint16_t) level;
+            }
+        } else {
+            crt_demo_pattern_render_color_bars(runtime, ctx, samples, sample_count);
+        }
+    }
+
+    for (size_t i = 0; i < sample_count; ++i) {
+        const size_t pixel_index = (i * CRT_DEMO_PATTERN_LOGICAL_WIDTH) / sample_count;
+        if (crt_demo_marker_pixel_for_standard(ctx->video_standard, ctx->active_line_index, pixel_index)) {
+            samples[i] = CRT_DEMO_LUMA_WHITE;
         }
     }
 }

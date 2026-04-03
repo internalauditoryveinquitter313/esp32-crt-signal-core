@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "esp_err.h"
@@ -14,6 +15,7 @@ extern "C" {
 
 typedef struct {
     crt_video_standard_t video_standard;
+    bool enable_color;
     crt_demo_pattern_mode_t demo_pattern_mode;
     uint16_t target_ready_depth;
     uint16_t min_ready_depth;

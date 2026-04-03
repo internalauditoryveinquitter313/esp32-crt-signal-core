@@ -11,6 +11,5 @@ size_t crt_line_policy_sync_width(const crt_timing_profile_t *timing, crt_timing
 
 bool crt_line_policy_has_burst(crt_timing_line_type_t line_type)
 {
-    (void)line_type;
-    return false;
+    return line_type == CRT_TIMING_LINE_TYPE_ACTIVE;
 }

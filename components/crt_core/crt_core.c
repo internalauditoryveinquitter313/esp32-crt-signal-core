@@ -73,7 +73,10 @@ static void crt_core_burst_stage(const crt_line_context_t *ctx, crt_line_buffer_
     const crt_core_burst_state_t *burst_state = (const crt_core_burst_state_t *)user_ctx;
     const uint16_t *template = burst_state->ntsc;
 
-    if (!crt_line_policy_has_burst(ctx->line_type) || ctx->burst_width == 0 || ctx->burst_offset >= line->sample_count) {
+    if (!s_config.enable_color ||
+        !crt_line_policy_has_burst(ctx->line_type) ||
+        ctx->burst_width == 0 ||
+        ctx->burst_offset >= line->sample_count) {
         return;
     }
 
@@ -216,7 +219,7 @@ static void crt_core_maybe_init_fast_mono_templates(void)
         return;
     }
 
-    if (s_config.demo_pattern_mode != CRT_DEMO_PATTERN_LUMA_BARS) {
+    if (s_config.demo_pattern_mode == CRT_DEMO_PATTERN_DISABLED) {
         return;
     }
 
