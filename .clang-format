@@ -1,0 +1,76 @@
+# ESP32 CRT Signal Core — clang-format 18+
+# Embedded C style: compact, readable, no surprises
+
+BasedOnStyle: LLVM
+Language: Cpp
+
+# Indent
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+IndentCaseLabels: false
+IndentPPDirectives: None
+NamespaceIndentation: None
+
+# Braces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeElse: false
+  BeforeWhile: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+
+# Line width
+ColumnLimit: 100
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveMacros: Consecutive
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignEscapedNewlines: Left
+AlignOperands: Align
+AlignTrailingComments: true
+
+# Pointers & references
+PointerAlignment: Right
+SpaceAroundPointerQualifiers: Default
+
+# Spaces
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpaceBeforeSquareBrackets: false
+
+# Includes
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Project headers
+  - Regex: '^"crt_'
+    Priority: 1
+  # ESP-IDF headers
+  - Regex: '^"(esp_|driver/|freertos/|soc/|hal/)'
+    Priority: 2
+  - Regex: '^<(esp_|driver/|freertos/|soc/|hal/)'
+    Priority: 2
+  # System headers
+  - Regex: '^<'
+    Priority: 3
+  # Catch-all
+  - Regex: '.*'
+    Priority: 4
+
+# Misc
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+MaxEmptyLinesToKeep: 1
+InsertBraces: false
+RemoveSemicolon: false

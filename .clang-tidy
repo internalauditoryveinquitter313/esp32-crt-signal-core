@@ -1,0 +1,33 @@
+# ESP32 CRT Signal Core — clang-tidy checks
+# Embedded-focused: catch real bugs, skip noise
+
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  misc-redundant-expression,
+  misc-unused-using-decls,
+  performance-*,
+  -performance-no-int-to-ptr,
+  readability-braces-around-statements,
+  readability-inconsistent-declaration-parameter-name,
+  readability-misleading-indentation,
+  readability-redundant-declaration,
+  readability-simplify-boolean-expr
+
+WarningsAsErrors: >
+  bugprone-use-after-move,
+  bugprone-integer-division,
+  bugprone-sizeof-expression,
+  bugprone-undefined-memory-manipulation
+
+CheckOptions:
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: '1'
+
+HeaderFilterRegex: 'components/.*'
+
+FormatStyle: file
