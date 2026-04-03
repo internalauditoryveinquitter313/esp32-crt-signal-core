@@ -1,0 +1,70 @@
+# ── ESP-IDF build artifacts ──────────────────────────────────────────
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+
+# ── CMake ────────────────────────────────────────────────────────────
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# ── Compilation / objects ────────────────────────────────────────────
+*.o
+*.obj
+*.a
+*.so
+*.elf
+*.bin
+*.map
+*.hex
+*.d
+*.lst
+
+# ── IDE & editors ────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.cproject
+.settings/
+*.code-workspace
+
+# ── CLion / JetBrains ───────────────────────────────────────────────
+cmake-build-*/
+.cache/
+
+# ── OS junk ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.bak
+*.tmp
+
+# ── Debug / profiling ───────────────────────────────────────────────
+*.dmp
+core
+core.*
+vgcore.*
+*.log
+
+# ── Test binaries (host-compiled) ───────────────────────────────────
+/tmp/*_test
+tests/*.out
+
+# ── Python (scripts/tools) ──────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# ── ccache / compilation database ───────────────────────────────────
+.ccache/
+compile_commands.json
+
+# -── Superpowers (if applicable) ───────────────────────────────────────
+/docs/superpowers/
