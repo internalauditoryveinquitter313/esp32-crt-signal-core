@@ -15,16 +15,16 @@ static void test_sync_width_tracks_line_type(void)
     assert(crt_line_policy_sync_width(&timing, CRT_TIMING_LINE_TYPE_VSYNC) == 845);
 }
 
-static void test_burst_presence_skips_only_vsync(void)
+static void test_burst_presence_disabled_for_monochrome_stability(void)
 {
-    assert(crt_line_policy_has_burst(CRT_TIMING_LINE_TYPE_ACTIVE));
-    assert(crt_line_policy_has_burst(CRT_TIMING_LINE_TYPE_BLANK));
+    assert(!crt_line_policy_has_burst(CRT_TIMING_LINE_TYPE_ACTIVE));
+    assert(!crt_line_policy_has_burst(CRT_TIMING_LINE_TYPE_BLANK));
     assert(!crt_line_policy_has_burst(CRT_TIMING_LINE_TYPE_VSYNC));
 }
 
 int main(void)
 {
     test_sync_width_tracks_line_type();
-    test_burst_presence_skips_only_vsync();
+    test_burst_presence_disabled_for_monochrome_stability();
     return 0;
 }

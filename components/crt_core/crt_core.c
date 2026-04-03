@@ -20,6 +20,7 @@
 #define CRT_CORE_PREP_TASK_PRIORITY 20
 #define CRT_CORE_STAGE_COUNT        4
 #define CRT_CORE_MAX_BURST_WIDTH    64
+#define CRT_CORE_MAX_LINE_SAMPLES   1136
 
 static bool s_initialized;
 static bool s_running;
@@ -42,6 +43,10 @@ typedef struct {
 
 static crt_core_stage_entry_t s_stages[CRT_CORE_STAGE_COUNT];
 static crt_core_burst_state_t s_burst_state;
+static bool s_fast_mono_mode;
+static uint16_t s_fast_active_line[CRT_CORE_MAX_LINE_SAMPLES];
+static uint16_t s_fast_blank_line[CRT_CORE_MAX_LINE_SAMPLES];
+static uint16_t s_fast_vsync_line[CRT_CORE_MAX_LINE_SAMPLES];
 
 static void crt_core_blanking_stage(const crt_line_context_t *ctx, crt_line_buffer_t *line, void *user_ctx)
 {
@@ -174,9 +179,12 @@ static crt_line_context_t crt_core_build_line_context(uint32_t line_index)
     };
 }
 
-static void crt_core_execute_stages(const crt_line_context_t *ctx, crt_line_buffer_t *line)
+static void crt_core_execute_stages(const crt_line_context_t *ctx, crt_line_buffer_t *line, bool render_active_stage)
 {
     for (size_t i = 0; i < CRT_CORE_STAGE_COUNT; ++i) {
+        if (!render_active_stage && i == (CRT_CORE_STAGE_COUNT - 1U)) {
+            continue;
+        }
         s_stages[i].fn(ctx, line, s_stages[i].user_ctx);
     }
 }
@@ -190,7 +198,7 @@ static void crt_core_apply_i2s_word_swap(uint16_t *buffer, size_t sample_count)
     }
 }
 
-static void crt_core_fill_line(uint32_t line_index, uint16_t *buffer, size_t sample_count)
+static void crt_core_fill_line(uint32_t line_index, uint16_t *buffer, size_t sample_count, bool render_active_stage)
 {
     crt_line_context_t ctx = crt_core_build_line_context(line_index);
     crt_line_buffer_t line = {
@@ -198,8 +206,24 @@ static void crt_core_fill_line(uint32_t line_index, uint16_t *buffer, size_t sam
         .sample_count = sample_count,
     };
 
-    crt_core_execute_stages(&ctx, &line);
+    crt_core_execute_stages(&ctx, &line, render_active_stage);
     crt_core_apply_i2s_word_swap(buffer, sample_count);
+}
+
+static void crt_core_maybe_init_fast_mono_templates(void)
+{
+    if (s_fast_mono_mode || s_timing.samples_per_line > CRT_CORE_MAX_LINE_SAMPLES) {
+        return;
+    }
+
+    if (s_config.demo_pattern_mode != CRT_DEMO_PATTERN_LUMA_BARS) {
+        return;
+    }
+
+    crt_core_fill_line(0, s_fast_active_line, s_timing.samples_per_line, true);
+    crt_core_fill_line(s_timing.active_lines, s_fast_blank_line, s_timing.samples_per_line, true);
+    crt_core_fill_line(s_timing.active_lines + 3U, s_fast_vsync_line, s_timing.samples_per_line, true);
+    s_fast_mono_mode = true;
 }
 
 static esp_err_t crt_core_fill_slot(size_t slot_index)
@@ -207,10 +231,24 @@ static esp_err_t crt_core_fill_slot(size_t slot_index)
     uint16_t *buffer = NULL;
     esp_err_t err = crt_hal_get_line_buffer(slot_index, &buffer);
     esp_cpu_cycle_count_t prep_start;
+    bool render_active_stage = crt_hal_get_recycled_queue_depth() >= s_config.min_ready_depth;
 
     ESP_RETURN_ON_ERROR(err, "crt_core", "failed to get line buffer");
     prep_start = esp_cpu_get_cycle_count();
-    crt_core_fill_line(s_next_line_index, buffer, s_timing.samples_per_line);
+    if (s_fast_mono_mode) {
+        crt_timing_line_type_t line_type =
+            crt_timing_get_line_type(s_config.video_standard, (uint16_t)(s_next_line_index % s_timing.total_lines));
+        const uint16_t *src = s_fast_blank_line;
+
+        if (line_type == CRT_TIMING_LINE_TYPE_ACTIVE) {
+            src = s_fast_active_line;
+        } else if (line_type == CRT_TIMING_LINE_TYPE_VSYNC) {
+            src = s_fast_vsync_line;
+        }
+        memcpy(buffer, src, s_timing.samples_per_line * sizeof(uint16_t));
+    } else {
+        crt_core_fill_line(s_next_line_index, buffer, s_timing.samples_per_line, render_active_stage);
+    }
     crt_diag_update_prep_cycles((uint32_t)(esp_cpu_get_cycle_count() - prep_start));
     s_next_line_index = (s_next_line_index + 1) % s_timing.total_lines;
     return ESP_OK;
@@ -258,9 +296,11 @@ esp_err_t crt_core_init(const crt_core_config_t *config)
     ESP_RETURN_ON_ERROR(err, "crt_core", "hal init failed");
 
     s_config = *config;
+    s_fast_mono_mode = false;
     crt_diag_reset();
     crt_demo_pattern_runtime_init(&s_demo_pattern, s_config.demo_pattern_mode, s_timing.active_lines);
     ESP_RETURN_ON_ERROR(crt_core_init_builtin_stages(), "crt_core", "builtin stage init failed");
+    crt_core_maybe_init_fast_mono_templates();
     s_initialized = true;
     return ESP_OK;
 }
