@@ -53,7 +53,7 @@
         panes.forEach(function (p) { p.classList.remove("active"); });
 
         tab.classList.add("active");
-        var pane = document.getElementById("tab-" + target);
+        var pane = document.querySelector('.tab-pane[data-tab="' + target + '"]');
         if (pane) pane.classList.add("active");
 
         activeTab = target;
