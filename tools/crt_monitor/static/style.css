@@ -101,16 +101,115 @@ body::after {
   position: relative;
   overflow: hidden;
   background: #000;
-  border-bottom: 1px solid var(--border);
+  min-height: 200px;
 }
 
-#live-img {
+#live-canvas {
   width: 100%;
   height: 100%;
   object-fit: contain;
   display: block;
   image-rendering: pixelated;
 }
+
+.stats-overlay {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  gap: 10px;
+  font-size: 10px;
+  font-family: var(--font);
+  color: var(--cyan);
+  text-shadow: 0 0 4px rgba(0,255,204,0.5);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.filter-panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,255,65,0.02);
+  font-size: 10px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-row label {
+  color: var(--green-dim);
+  letter-spacing: 0.1em;
+  min-width: 36px;
+}
+
+.filter-row select {
+  background: var(--bg);
+  color: var(--green);
+  border: 1px solid var(--border);
+  font-family: var(--font);
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.filter-row input[type="range"] {
+  width: 80px;
+  accent-color: var(--green);
+  height: 14px;
+}
+
+.range-val {
+  color: var(--cyan);
+  min-width: 24px;
+  text-align: right;
+  font-size: 9px;
+}
+
+.luma-chart {
+  flex-shrink: 0;
+  width: 100%;
+  height: 60px;
+  display: block;
+  border-bottom: 1px solid var(--border);
+}
+
+.action-bar {
+  flex-shrink: 0;
+  display: flex;
+  border-top: 1px solid var(--border);
+}
+
+.btn-action {
+  flex: 1;
+  padding: 10px 0;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--green);
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+  min-height: 40px;
+  transition: background 0.15s;
+}
+
+.btn-action:last-child { border-right: none; }
+.btn-action:hover { background: rgba(0,255,65,0.08); }
+.btn-action:disabled { color: var(--green-dim); cursor: default; }
+
+.btn-rec { color: #ff5555; }
+.btn-rec:hover { background: rgba(255,50,50,0.1); }
+.btn-analyze { color: #aa88ff; }
+.btn-analyze:hover { background: rgba(170,136,255,0.08); }
 
 .feed-overlay {
   position: absolute;

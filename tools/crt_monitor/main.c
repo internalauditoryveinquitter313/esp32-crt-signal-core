@@ -26,19 +26,32 @@ static void signal_handler(int sig)
 }
 
 /* ------------------------------------------------------------------ */
-/* Frame timer callback (~3 fps)                                        */
+/* Frame timer callback (30 fps capture, ~3 fps WS broadcast)           */
 /* ------------------------------------------------------------------ */
+static int s_frame_tick = 0;
+
 static void frame_timer(void *arg)
 {
     struct mg_mgr *mgr = (struct mg_mgr *)arg;
 
-    if (s_app.ws_client_count <= 0) return;
+    if (!s_app.capture) return;
+    if (s_app.ws_client_count <= 0 && !s_app.recording) return;
 
     const uint8_t *jpg = NULL;
     size_t len = 0;
     if (capture_grab(s_app.capture, &jpg, &len) != 0 || jpg == NULL) return;
 
-    routes_broadcast_frame(mgr, jpg, len);
+    s_frame_tick++;
+
+    /* Recording: save every frame at 30 fps */
+    if (s_app.recording) {
+        routes_record_frame(jpg, len);
+    }
+
+    /* WS broadcast: throttle to ~3 fps (every 10th frame) */
+    if (s_app.ws_client_count > 0 && (s_frame_tick % 10) == 0) {
+        routes_broadcast_frame(mgr, jpg, len);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -120,8 +133,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* Frame broadcast timer — ~3 fps */
-    mg_timer_add(&mgr, 333, MG_TIMER_REPEAT, frame_timer, &mgr);
+    /* Frame timer — 30 fps capture, WS broadcast throttled to ~3 fps */
+    mg_timer_add(&mgr, 33, MG_TIMER_REPEAT, frame_timer, &mgr);
 
     printf("CRT Monitor listening on %s\n", listen_url);
     printf("  device      : %s\n", device);

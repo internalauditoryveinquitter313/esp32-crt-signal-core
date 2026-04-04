@@ -174,6 +174,104 @@ static void handle_api_gallery_delete(struct mg_connection *c,
 }
 
 /* ------------------------------------------------------------------ */
+/* POST /api/record?duration=N                                          */
+/* ------------------------------------------------------------------ */
+static void handle_api_record_start(struct mg_connection *c,
+                                     struct mg_http_message *hm)
+{
+    if (!s_app) {
+        mg_http_reply(c, 503, "Content-Type: application/json\r\n",
+                      "{\"error\":\"not initialised\"}\n");
+        return;
+    }
+    if (s_app->recording) {
+        mg_http_reply(c, 409, "Content-Type: application/json\r\n",
+                      "{\"error\":\"already recording\",\"frames_left\":%d}\n",
+                      s_app->rec_frames_left);
+        return;
+    }
+
+    /* Parse duration (seconds) from query string, default 5, max 30 */
+    int duration = 5;
+    struct mg_str q = hm->query;
+    char tmp[16] = {0};
+    if (mg_http_get_var(&q, "duration", tmp, sizeof(tmp)) > 0) {
+        duration = atoi(tmp);
+    }
+    if (duration < 1) duration = 1;
+    if (duration > 30) duration = 30;
+
+    /* Create recording directory */
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    snprintf(s_app->rec_dir, sizeof(s_app->rec_dir), "%s/rec_%ld",
+             s_app->captures_dir, (long)ts.tv_sec);
+    mkdir(s_app->rec_dir, 0755);
+
+    s_app->rec_frames_left  = duration * 30;
+    s_app->rec_frames_saved = 0;
+    s_app->recording        = true;
+
+    mg_http_reply(c, 200, "Content-Type: application/json\r\n",
+        "{\"ok\":true,\"dir\":\"%s\",\"duration\":%d,\"target_frames\":%d}\n",
+        s_app->rec_dir, duration, s_app->rec_frames_left);
+}
+
+/* ------------------------------------------------------------------ */
+/* GET /api/record                                                      */
+/* ------------------------------------------------------------------ */
+static void handle_api_record_status(struct mg_connection *c,
+                                      struct mg_http_message *hm)
+{
+    (void)hm;
+    if (!s_app) {
+        mg_http_reply(c, 503, "Content-Type: application/json\r\n",
+                      "{\"error\":\"not initialised\"}\n");
+        return;
+    }
+    mg_http_reply(c, 200, "Content-Type: application/json\r\n",
+        "{\"recording\":%s,\"frames_saved\":%d,\"frames_left\":%d,\"dir\":\"%s\"}\n",
+        s_app->recording ? "true" : "false",
+        s_app->rec_frames_saved,
+        s_app->rec_frames_left,
+        s_app->rec_dir);
+}
+
+/* ------------------------------------------------------------------ */
+/* POST /api/analyze?dir=<path>                                         */
+/* ------------------------------------------------------------------ */
+static void handle_api_analyze(struct mg_connection *c,
+                                struct mg_http_message *hm)
+{
+    char dir[256] = {0};
+    struct mg_str q = hm->query;
+    if (mg_http_get_var(&q, "dir", dir, sizeof(dir)) <= 0) {
+        mg_http_reply(c, 400, "Content-Type: application/json\r\n",
+                      "{\"error\":\"missing dir param\"}\n");
+        return;
+    }
+
+    /* Sanitize — reject path traversal */
+    if (strstr(dir, "..") != NULL) {
+        mg_http_reply(c, 400, "Content-Type: application/json\r\n",
+                      "{\"error\":\"invalid dir\"}\n");
+        return;
+    }
+
+    /* Run R analysis in background */
+    /* Resolve R script relative to the server binary's parent dir */
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd),
+        "Rscript ../analysis/crt_flicker_analysis.R '%s' '%s/analysis' "
+        ">/tmp/r_analysis.log 2>&1 &",
+        dir, dir);
+    system(cmd);
+
+    mg_http_reply(c, 200, "Content-Type: application/json\r\n",
+        "{\"ok\":true,\"dir\":\"%s\"}\n", dir);
+}
+
+/* ------------------------------------------------------------------ */
 /* GET /api/status                                                      */
 /* ------------------------------------------------------------------ */
 static void handle_api_status(struct mg_connection *c,
@@ -206,6 +304,27 @@ void routes_handle(struct mg_connection *c, int ev, void *ev_data)
         if (mg_strcmp(method, mg_str("POST")) == 0 &&
             mg_match(uri, mg_str("/api/capture"), NULL)) {
             handle_api_capture(c, hm);
+            return;
+        }
+
+        /* POST /api/record */
+        if (mg_strcmp(method, mg_str("POST")) == 0 &&
+            mg_match(uri, mg_str("/api/record"), NULL)) {
+            handle_api_record_start(c, hm);
+            return;
+        }
+
+        /* GET /api/record */
+        if (mg_strcmp(method, mg_str("GET")) == 0 &&
+            mg_match(uri, mg_str("/api/record"), NULL)) {
+            handle_api_record_status(c, hm);
+            return;
+        }
+
+        /* POST /api/analyze */
+        if (mg_strcmp(method, mg_str("POST")) == 0 &&
+            mg_match(uri, mg_str("/api/analyze"), NULL)) {
+            handle_api_analyze(c, hm);
             return;
         }
 
@@ -258,6 +377,32 @@ void routes_handle(struct mg_connection *c, int ev, void *ev_data)
         if (c->data[0] == 'W' && s_app) {
             s_app->ws_client_count--;
         }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Save frame to recording directory (called from fast timer)           */
+/* ------------------------------------------------------------------ */
+void routes_record_frame(const uint8_t *jpg, size_t len)
+{
+    if (!s_app || !s_app->recording || s_app->rec_frames_left <= 0) return;
+
+    char path[512];
+    snprintf(path, sizeof(path), "%s/frame_%04d.jpg",
+             s_app->rec_dir, s_app->rec_frames_saved);
+
+    FILE *f = fopen(path, "wb");
+    if (f) {
+        fwrite(jpg, 1, len, f);
+        fclose(f);
+    }
+
+    s_app->rec_frames_saved++;
+    s_app->rec_frames_left--;
+    if (s_app->rec_frames_left <= 0) {
+        s_app->recording = false;
+        fprintf(stderr, "[record] done: %d frames in %s\n",
+                s_app->rec_frames_saved, s_app->rec_dir);
     }
 }
 

@@ -1,2 +1,5 @@
+# Binary
 crt_monitor
-captures/*.jpg
+
+# All runtime capture data (JPEGs, recordings, R analysis output)
+captures/

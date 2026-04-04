@@ -12,10 +12,50 @@
     <!-- LIVE TAB -->
     <div class="tab-pane active" data-tab="live">
       <div class="feed-container">
-        <img id="live-img" alt="live feed">
+        <canvas id="live-canvas"></canvas>
         <div id="feed-overlay" class="feed-overlay">NO SIGNAL</div>
+        <!-- Stats overlay -->
+        <div id="stats-overlay" class="stats-overlay">
+          <span id="stat-luma">Y:--</span>
+          <span id="stat-delta">Δ:--</span>
+          <span id="stat-fps">FPS:--</span>
+        </div>
       </div>
-      <button id="btn-capture" class="btn-capture">[ CAPTURE ]</button>
+
+      <!-- Filter controls -->
+      <div id="filter-panel" class="filter-panel">
+        <div class="filter-row">
+          <label>FILTER</label>
+          <select id="filter-select">
+            <option value="none">NONE</option>
+            <option value="grayscale">GRAYSCALE</option>
+            <option value="invert">INVERT</option>
+            <option value="edge">EDGE DETECT</option>
+            <option value="falsecolor">FALSE COLOR</option>
+            <option value="threshold">THRESHOLD</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <label>BRI</label>
+          <input type="range" id="sl-brightness" min="-100" max="100" value="0">
+          <span id="val-brightness" class="range-val">0</span>
+        </div>
+        <div class="filter-row">
+          <label>CON</label>
+          <input type="range" id="sl-contrast" min="-100" max="100" value="0">
+          <span id="val-contrast" class="range-val">0</span>
+        </div>
+      </div>
+
+      <!-- Luminance chart -->
+      <canvas id="luma-chart" class="luma-chart" height="60"></canvas>
+
+      <!-- Action buttons -->
+      <div class="action-bar">
+        <button id="btn-capture" class="btn-action">CAPTURE</button>
+        <button id="btn-record" class="btn-action btn-rec">REC 5s</button>
+        <button id="btn-analyze" class="btn-action btn-analyze">R ANALYZE</button>
+      </div>
     </div>
 
     <!-- GALLERY TAB -->
@@ -47,7 +87,8 @@
 
   <div class="status-line">
     <span id="ws-status">DISCONNECTED</span>
-    <span id="frame-counter">0 frames</span>
+    <span id="rec-status"></span>
+    <span id="frame-counter">0</span>
   </div>
 </div>
 <script src="/app.js"></script>
