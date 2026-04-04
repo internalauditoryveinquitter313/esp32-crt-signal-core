@@ -12,6 +12,7 @@
 #include "crt_hal.h"
 #include "crt_line_policy.h"
 #include "crt_stage.h"
+#include "crt_scanline.h"
 #include "crt_waveform.h"
 
 #define CRT_CORE_SYNC_LEVEL         ((uint16_t)0x0000)
@@ -29,6 +30,17 @@ static crt_timing_profile_t s_timing;
 static TaskHandle_t s_prep_task;
 static uint32_t s_next_line_index;
 static crt_demo_pattern_runtime_t s_demo_pattern;
+
+/* ── Hook layer ──────────────────────────────────────────────────── */
+static crt_frame_hook_fn     s_frame_hook;
+static void                 *s_frame_hook_data;
+static crt_scanline_hook_fn  s_scanline_hook;
+static void                 *s_scanline_hook_data;
+static crt_mod_hook_fn       s_mod_hook;
+static void                 *s_mod_hook_data;
+static uint32_t              s_frame_number;
+static uint32_t              s_subcarrier_phase;
+static uint32_t              s_phase_step_q20;
 
 typedef struct {
     crt_stage_fn_t fn;
@@ -182,6 +194,27 @@ static crt_line_context_t crt_core_build_line_context(uint32_t line_index)
     };
 }
 
+static crt_scanline_t crt_core_build_scanline(const crt_line_context_t *ctx)
+{
+    crt_line_type_t type;
+    switch (ctx->line_type) {
+    case CRT_TIMING_LINE_TYPE_ACTIVE: type = CRT_LINE_ACTIVE;   break;
+    case CRT_TIMING_LINE_TYPE_VSYNC:  type = CRT_LINE_VSYNC;    break;
+    default:                          type = CRT_LINE_BLANK;     break;
+    }
+
+    return (crt_scanline_t) {
+        .physical_line    = ctx->line_index,
+        .logical_line     = ctx->in_active ? ctx->active_line_index
+                                           : CRT_SCANLINE_LOGICAL_LINE_NONE,
+        .type             = type,
+        .field            = 0,
+        .frame_number     = s_frame_number,
+        .subcarrier_phase = s_subcarrier_phase,
+        .timing           = &s_timing,
+    };
+}
+
 static void crt_core_execute_stages(const crt_line_context_t *ctx, crt_line_buffer_t *line, bool render_active_stage)
 {
     for (size_t i = 0; i < CRT_CORE_STAGE_COUNT; ++i) {
@@ -235,12 +268,26 @@ static esp_err_t crt_core_fill_slot(size_t slot_index)
     esp_err_t err = crt_hal_get_line_buffer(slot_index, &buffer);
     esp_cpu_cycle_count_t prep_start;
     bool render_active_stage = crt_hal_get_recycled_queue_depth() >= s_config.min_ready_depth;
+    uint16_t phys_line = (uint16_t)(s_next_line_index % s_timing.total_lines);
 
     ESP_RETURN_ON_ERROR(err, "crt_core", "failed to get line buffer");
+
+    /* ── Frame boundary ───────────────────────────────────────────── */
+    if (phys_line == 0) {
+        if (s_next_line_index > 0) {
+            s_frame_number++;
+        }
+        if (s_frame_hook != NULL) {
+            s_frame_hook(s_frame_number, s_frame_hook_data);
+        }
+    }
+
     prep_start = esp_cpu_get_cycle_count();
-    if (s_fast_mono_mode) {
+
+    if (s_fast_mono_mode && s_scanline_hook == NULL && s_mod_hook == NULL) {
+        /* Fast template path — no hooks can interfere */
         crt_timing_line_type_t line_type =
-            crt_timing_get_line_type(s_config.video_standard, (uint16_t)(s_next_line_index % s_timing.total_lines));
+            crt_timing_get_line_type(s_config.video_standard, phys_line);
         const uint16_t *src = s_fast_blank_line;
 
         if (line_type == CRT_TIMING_LINE_TYPE_ACTIVE) {
@@ -249,10 +296,44 @@ static esp_err_t crt_core_fill_slot(size_t slot_index)
             src = s_fast_vsync_line;
         }
         memcpy(buffer, src, s_timing.samples_per_line * sizeof(uint16_t));
+    } else if (s_scanline_hook != NULL || s_mod_hook != NULL) {
+        /* Hook path — interleave stages with hook invocations */
+        crt_line_context_t ctx = crt_core_build_line_context(s_next_line_index);
+        crt_line_buffer_t line = {
+            .samples = buffer,
+            .sample_count = s_timing.samples_per_line,
+        };
+        crt_scanline_t sc = crt_core_build_scanline(&ctx);
+
+        /* Stages 0..2: blanking, sync, burst */
+        for (size_t i = 0; i < CRT_CORE_STAGE_COUNT - 1; ++i) {
+            s_stages[i].fn(&ctx, &line, s_stages[i].user_ctx);
+        }
+
+        /* Active content: scanline hook takes priority */
+        if (s_scanline_hook != NULL && ctx.in_active && render_active_stage) {
+            s_scanline_hook(&sc,
+                           &buffer[ctx.active_offset],
+                           ctx.active_width,
+                           s_scanline_hook_data);
+        } else if (render_active_stage) {
+            s_stages[CRT_CORE_STAGE_COUNT - 1].fn(&ctx, &line,
+                s_stages[CRT_CORE_STAGE_COUNT - 1].user_ctx);
+        }
+
+        /* Mod hook: full line post-processing (before I2S swap) */
+        if (s_mod_hook != NULL) {
+            s_mod_hook(&sc, buffer, s_timing.samples_per_line, s_mod_hook_data);
+        }
+
+        crt_core_apply_i2s_word_swap(buffer, s_timing.samples_per_line);
     } else {
+        /* Standard path — no hooks, no fast mono */
         crt_core_fill_line(s_next_line_index, buffer, s_timing.samples_per_line, render_active_stage);
     }
+
     crt_diag_update_prep_cycles((uint32_t)(esp_cpu_get_cycle_count() - prep_start));
+    s_subcarrier_phase = CRT_PHASE_Q20_ADVANCE(s_subcarrier_phase, s_phase_step_q20);
     s_next_line_index = (s_next_line_index + 1) % s_timing.total_lines;
     return ESP_OK;
 }
@@ -304,6 +385,8 @@ esp_err_t crt_core_init(const crt_core_config_t *config)
     crt_demo_pattern_runtime_init(&s_demo_pattern, s_config.demo_pattern_mode, s_timing.active_lines);
     ESP_RETURN_ON_ERROR(crt_core_init_builtin_stages(), "crt_core", "builtin stage init failed");
     crt_core_maybe_init_fast_mono_templates();
+    s_phase_step_q20 = (uint32_t)(s_timing.samples_per_line % 4U)
+                       * (CRT_PHASE_Q20_FULL_CYCLE / 4U);
     s_initialized = true;
     return ESP_OK;
 }
@@ -316,6 +399,8 @@ esp_err_t crt_core_start(void)
     ESP_RETURN_ON_FALSE(!s_running, ESP_ERR_INVALID_STATE, "crt_core", "already running");
 
     s_next_line_index = 0;
+    s_frame_number = 0;
+    s_subcarrier_phase = 0;
     for (size_t slot_index = 0; slot_index < crt_hal_get_slot_count(); ++slot_index) {
         err = crt_core_fill_slot(slot_index);
         ESP_RETURN_ON_ERROR(err, "crt_core", "failed to prime line buffers");
@@ -378,6 +463,9 @@ esp_err_t crt_core_deinit(void)
     s_initialized = false;
     memset(&s_timing, 0, sizeof(s_timing));
     memset(&s_config, 0, sizeof(s_config));
+    s_frame_hook = NULL;
+    s_scanline_hook = NULL;
+    s_mod_hook = NULL;
     return ESP_OK;
 }
 
@@ -387,5 +475,28 @@ esp_err_t crt_core_get_diag_snapshot(crt_diag_snapshot_t *out_snapshot)
     ESP_RETURN_ON_FALSE(out_snapshot != NULL, ESP_ERR_INVALID_ARG, "crt_core", "snapshot is null");
 
     crt_diag_get_snapshot(out_snapshot);
+    return ESP_OK;
+}
+
+/* ── Hook registration ────────────────────────────────────────────── */
+
+esp_err_t crt_register_frame_hook(crt_frame_hook_fn hook, void *user_data)
+{
+    s_frame_hook_data = user_data;
+    s_frame_hook = hook;
+    return ESP_OK;
+}
+
+esp_err_t crt_register_scanline_hook(crt_scanline_hook_fn hook, void *user_data)
+{
+    s_scanline_hook_data = user_data;
+    s_scanline_hook = hook;
+    return ESP_OK;
+}
+
+esp_err_t crt_register_mod_hook(crt_mod_hook_fn hook, void *user_data)
+{
+    s_mod_hook_data = user_data;
+    s_mod_hook = hook;
     return ESP_OK;
 }
