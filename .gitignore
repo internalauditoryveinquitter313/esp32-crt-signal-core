@@ -66,5 +66,6 @@ __pycache__/
 .ccache/
 compile_commands.json
 
-# -── Superpowers (if applicable) ───────────────────────────────────────
+# ── Superpowers ─────────────────────────────────────────────────────
 /docs/superpowers/
+.superpowers/
