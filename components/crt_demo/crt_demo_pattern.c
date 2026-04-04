@@ -189,12 +189,23 @@ void crt_demo_pattern_runtime_init(crt_demo_pattern_runtime_t *runtime,
                                    crt_demo_pattern_mode_t mode,
                                    uint16_t active_line_count)
 {
+    const size_t safe_margin = CRT_DEMO_PATTERN_LOGICAL_WIDTH / 10U; /* ~10% each side */
+
     runtime->mode = mode;
     runtime->active_line_count = active_line_count;
     runtime->ramp_height_lines = CRT_DEMO_RAMP_HEIGHT_LINES;
 
     crt_demo_pattern_build_color_bars_row(runtime->color_bars_row, CRT_DEMO_PATTERN_LOGICAL_WIDTH);
     crt_demo_pattern_build_grayscale_ramp_row(runtime->grayscale_ramp_row, CRT_DEMO_PATTERN_LOGICAL_WIDTH);
+
+    /* Apply safe area margins — set edges to black so all 8 bars fit within
+       the ~80% center of the active window, avoiding CRT overscan cutoff. */
+    for (size_t i = 0; i < safe_margin; ++i) {
+        runtime->color_bars_row[i] = 7U; /* black */
+        runtime->color_bars_row[CRT_DEMO_PATTERN_LOGICAL_WIDTH - 1U - i] = 7U;
+        runtime->grayscale_ramp_row[i] = 0U;
+        runtime->grayscale_ramp_row[CRT_DEMO_PATTERN_LOGICAL_WIDTH - 1U - i] = 255U;
+    }
 }
 
 void crt_demo_pattern_render_active_window(const crt_demo_pattern_runtime_t *runtime,
