@@ -67,7 +67,12 @@ __pycache__/
 compile_commands.json
 
 # ── Superpowers ─────────────────────────────────────────────────────
-/docs/superpowers/
+/docs/superpowers/*
+!/docs/superpowers/specs/
+!/docs/superpowers/specs/**
+!/docs/superpowers/plans/
+!/docs/superpowers/plans/**
+/docs/superpowers/tmp/
 .worktrees/
 .superpowers/
 .playwright-mcp/
