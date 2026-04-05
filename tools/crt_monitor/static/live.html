@@ -45,7 +45,7 @@ a:active{color:#fff}
     st.textContent='polling';st.style.color='#00ffcc';
     feed.onerror=null;feed.onload=null;
     (function poll(){
-      fetch('/api/snapshot',{cache:'no-store'})
+      fetch('/api/snapshot?ts='+Date.now(),{cache:'no-store'})
         .then(function(r){if(!r.ok)throw r;return r.blob()})
         .then(function(b){
           var u=URL.createObjectURL(b);
