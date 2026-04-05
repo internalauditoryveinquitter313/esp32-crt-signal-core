@@ -208,7 +208,7 @@ nav button.on{color:var(--g);background:rgba(0,255,65,.06);border-top:2px solid 
     if(!items.length){gal.innerHTML='<p class="gallery-empty">NO CAPTURES</p>';return}
     items.forEach(function(it,i){
       var img=document.createElement('img');
-      img.src='/captures/'+it.file;img.alt=it.file;img.loading='lazy';
+      img.src='/captures/'+it.file+'?v='+(it.mtime||0);img.alt=it.file;img.loading='lazy';
       img.addEventListener('click',function(){openLb(i)});
       gal.appendChild(img);
     });
@@ -217,7 +217,7 @@ nav button.on{color:var(--g);background:rgba(0,255,65,.06);border-top:2px solid 
   /* ── Lightbox ──────────────────────────────── */
   function openLb(i){lbIdx=i;updLb();lb.classList.add('on')}
   function closeLb(){lb.classList.remove('on')}
-  function updLb(){lbImg.src='/captures/'+items[lbIdx].file;lbN.textContent=items[lbIdx].file}
+  function updLb(){lbImg.src='/captures/'+items[lbIdx].file+'?v='+(items[lbIdx].mtime||0);lbN.textContent=items[lbIdx].file}
   document.getElementById('lb-p').addEventListener('click',function(){if(lbIdx>0){lbIdx--;updLb()}});
   document.getElementById('lb-nx').addEventListener('click',function(){if(lbIdx<items.length-1){lbIdx++;updLb()}});
   document.getElementById('lb-x').addEventListener('click',closeLb);
