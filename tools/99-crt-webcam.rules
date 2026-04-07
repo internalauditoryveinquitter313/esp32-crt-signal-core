@@ -1,0 +1,7 @@
+# udev rule — auto-configure Logitech C270 for CRT capture
+# Install: sudo cp 99-crt-webcam.rules /etc/udev/rules.d/ && sudo udevadm control --reload
+#
+# Logitech C270 = 046d:0825
+# Sets: manual exposure synced to NTSC frame rate, low noise, no flicker
+ACTION=="add", SUBSYSTEM=="video4linux", ATTR{idVendor}=="046d", ATTR{idProduct}=="0825", \
+  RUN+="/usr/bin/v4l2-ctl -d /dev/%k --set-ctrl=auto_exposure=1,exposure_time_absolute=333,exposure_dynamic_framerate=0,backlight_compensation=0,white_balance_automatic=0,white_balance_temperature=5500,gain=32,power_line_frequency=0,sharpness=16,saturation=48,contrast=40"
