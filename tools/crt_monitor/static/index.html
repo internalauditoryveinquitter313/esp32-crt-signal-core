@@ -2,276 +2,1489 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1" name="viewport">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta content="default" name="apple-mobile-web-app-status-bar-style">
 <meta name="apple-mobile-web-app-title" content="PhosphorOS">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0a0a0a">
-<link rel="manifest" href="/manifest.json?v=6">
-<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+    <meta content="#008080" name="theme-color">
+    <link href="/manifest.json?v=12" rel="manifest">
 <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
+    <link href="https://unpkg.com/98.css" rel="stylesheet">
 <title>PhosphorOS</title>
 <style>
-:root{--bg:#0a0a0a;--g:#00ff41;--gd:#0a6e2a;--gg:rgba(0,255,65,.4);--c:#00ffcc;--r:#ff3333;--b:rgba(0,255,51,.15);--f:"Fira Code","JetBrains Mono","SF Mono",monospace}
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;background:var(--bg);color:var(--g);font:12px var(--f);overflow:hidden;-webkit-tap-highlight-color:transparent}
+    :root {
+        --face: #c0c0c0;
+        --hi: #fff;
+        --lo: #808080;
+        --dk: #404040;
+        --active: #000080;
+        --active-text: #fff
+    }
 
-/* App shell */
-#app{display:flex;flex-direction:column;height:100dvh}
-#main{flex:1;overflow:hidden;position:relative}
+    html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden
+    }
 
-/* Feed */
-.feed{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#000}
-.feed img{max-width:100%;max-height:100%;object-fit:contain;image-rendering:auto}
-#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(16px,4vw,28px);letter-spacing:.3em;color:var(--g);text-shadow:0 0 16px var(--gg);background:rgba(0,0,0,.6)}
-#overlay.off{display:none}
+    * {
+        box-sizing: border-box
+    }
 
-/* Filter bar */
-.filters{display:flex;gap:2px;padding:6px;border-top:1px solid var(--b);background:rgba(0,0,0,.8);flex-wrap:wrap;align-items:center}
-.filters select,.filters input{background:var(--bg);color:var(--g);border:1px solid var(--b);font:10px var(--f);padding:3px 6px;border-radius:2px}
-.filters input[type=range]{width:60px;accent-color:var(--g)}
-.filters label{color:var(--gd);font-size:9px;letter-spacing:.1em}
-.fv{color:var(--c);font-size:9px;min-width:20px;text-align:center}
+    /* Desktop */
+    .desktop {
+        width: 100%;
+        height: 100dvh;
+        background: #008080;
+        display: flex;
+        flex-direction: column;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent
+    }
 
-/* Gallery */
-.gallery{flex:1;overflow-y:auto;padding:6px;display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px;align-content:start;-webkit-overflow-scrolling:touch}
-.gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;border:1px solid var(--b);border-radius:2px;cursor:pointer}
-.gallery img:active{border-color:var(--g);box-shadow:0 0 8px var(--gg)}
-.gallery-empty{grid-column:1/-1;text-align:center;padding:40px;color:var(--gd)}
+    .desk-area {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        padding: 2px
+    }
 
-/* Lightbox */
-.lb{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.95);display:none;flex-direction:column;align-items:center;justify-content:center;padding:12px}
-.lb.on{display:flex}
-.lb img{max-width:100%;max-height:calc(100dvh - 80px);object-fit:contain;touch-action:pinch-zoom}
-.lb-bar{display:flex;gap:12px;margin-top:8px;align-items:center}
-.lb-bar span{color:var(--c);font-size:10px;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lb-x{position:absolute;top:8px;right:8px}
-.btn{background:transparent;border:1px solid var(--b);color:var(--g);font:12px var(--f);padding:8px 14px;cursor:pointer;border-radius:2px;min-height:40px;letter-spacing:.1em}
-.btn:active{background:var(--gd);color:#fff}
-.btn.red{color:var(--r);border-color:var(--r)}
+    /* Window — fills viewport minus taskbar */
+    .app {
+        position: absolute;
+        inset: 0 0 30px 0;
+        display: flex;
+        flex-direction: column
+    }
 
-/* Tab bar */
-nav{display:flex;border-top:1px solid var(--b);background:var(--bg)}
-nav button{flex:1;background:transparent;border:none;border-right:1px solid var(--b);color:var(--gd);font:11px var(--f);padding:12px 0;cursor:pointer;letter-spacing:.15em;min-height:44px}
-nav button:last-child{border-right:none}
-nav button.on{color:var(--g);background:rgba(0,255,65,.06);border-top:2px solid var(--g);text-shadow:0 0 6px var(--gg)}
+    .app > .title-bar {
+        flex-shrink: 0
+    }
 
-/* Status bar */
-.st{display:flex;justify-content:space-between;padding:0 8px;height:24px;align-items:center;border-top:1px solid var(--b);font-size:9px;color:var(--gd);letter-spacing:.1em;background:rgba(0,255,65,.02)}
-.st .ok{color:var(--g)}
-.st .err{color:var(--r)}
+    .app > .window-body {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        padding: 0 !important;
+        margin: 0 !important
+    }
 
-/* Panels */
-.panel{display:none;flex-direction:column;height:100%;overflow:hidden}
-.panel.on{display:flex}
+    /* ── Tabs ── */
+    .tab-row {
+        flex-shrink: 0;
+        padding: 2px 4px 0
+    }
 
-/* Status readout */
-.readout{flex:1;overflow-y:auto;padding:12px;font-size:11px;line-height:1.8;white-space:pre-wrap;color:var(--g);text-shadow:0 0 4px var(--gg)}
+    .tab-row menu[role=tablist] {
+        margin: 0
+    }
 
-/* Safe area */
-@supports(padding:max(0px)){nav{padding-bottom:max(0px,env(safe-area-inset-bottom))}}
-@media(min-width:600px){.gallery{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
+    .tab-row menu li {
+        font-size: 13px;
+        padding: 5px 16px
+    }
+
+    /* ── Panel area ── */
+    .panel-area {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        border: 2px solid;
+        border-color: var(--lo) var(--hi) var(--hi) var(--lo);
+        margin: 0 4px;
+        background: var(--face)
+    }
+
+    .pane {
+        flex: 1;
+        flex-direction: column;
+        overflow: hidden;
+        display: none
+    }
+
+    .pane.on {
+        display: flex
+    }
+
+    /* ════════════════ LIVE VIEW ════════════════ */
+    .live-pane {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch
+    }
+
+    /* Monitor */
+    .screen {
+        background: #000;
+        position: relative;
+        border: 2px solid;
+        border-color: var(--lo) var(--hi) var(--hi) var(--lo);
+        margin: 4px
+    }
+
+    .screen img, .screen canvas {
+        width: 100%;
+        display: block;
+        aspect-ratio: 4/3;
+        object-fit: contain;
+        background: #000
+    }
+
+    #ov {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font: bold 13px Arial;
+        color: #808080;
+        background: #000;
+        transition: opacity .4s
+    }
+
+    #ov.off {
+        opacity: 0;
+        pointer-events: none
+    }
+
+    /* Toolbar strip */
+    .tbar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 6px;
+        flex-wrap: wrap
+    }
+
+    .tbar button {
+        min-height: 28px;
+        font-size: 12px;
+        padding: 2px 12px
+    }
+
+    .tbar select {
+        min-height: 26px;
+        font-size: 12px
+    }
+
+    .tbar .div {
+        width: 1px;
+        height: 22px;
+        border-left: 1px solid var(--lo);
+        border-right: 1px solid var(--hi)
+    }
+
+    /* Upload section — always visible at top */
+    .upload-section {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        background: linear-gradient(180deg, #fffff0, #ffffcc);
+        border-bottom: 2px solid;
+        border-color: var(--lo) var(--hi) var(--hi) var(--lo)
+    }
+
+    .upload-btn {
+        font-weight: bold;
+        min-height: 40px;
+        padding: 6px 20px;
+        font-size: 14px;
+        flex-shrink: 0
+    }
+
+    .upload-msg {
+        font-size: 12px;
+        flex: 1;
+        text-align: center;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap
+    }
+
+    .upload-msg:empty {
+        display: none
+    }
+
+    .upload-prog-wrap {
+        width: 100%;
+        padding: 2px 0
+    }
+
+    /* Recording progress */
+    .rec-wrap {
+        padding: 2px 8px 4px;
+        display: none
+    }
+
+    /* Lens fieldset */
+    .lens-fs {
+        margin: 2px 4px 4px;
+        padding: 6px 8px 8px
+    }
+
+    .lens-fs legend {
+        font-size: 11px
+    }
+
+    .lens-group {
+        margin-bottom: 4px
+    }
+
+    .lens-group:last-child {
+        margin-bottom: 0
+    }
+
+    .lens-label {
+        font-size: 9px;
+        color: var(--lo);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        margin-bottom: 2px;
+        display: block
+    }
+
+    .lens-btns {
+        display: flex;
+        gap: 3px;
+        flex-wrap: wrap
+    }
+
+    .lens-btns button {
+        font-size: 11px;
+        padding: 3px 10px;
+        min-height: 28px
+    }
+
+    .lens-btns button.sel {
+        box-shadow: inset 1px 1px 3px var(--dk);
+        background: #d8d8d8
+    }
+
+    /* Custom sliders */
+    .adj-fs {
+        margin: 0 4px 4px;
+        padding: 6px 8px
+    }
+
+    .adj-fs[hidden] {
+        display: none
+    }
+
+    .adj-fs legend {
+        font-size: 11px
+    }
+
+    .adj-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 3px 0
+    }
+
+    .adj-row label {
+        font-size: 11px;
+        width: 30px;
+        text-align: right;
+        flex-shrink: 0
+    }
+
+    .adj-row input[type=range] {
+        flex: 1;
+        height: 20px
+    }
+
+    .adj-row .val {
+        font-size: 11px;
+        width: 30px;
+        text-align: center;
+        flex-shrink: 0
+    }
+
+    /* ════════════════ CAPTURES ════════════════ */
+    .cap-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 6px;
+        border-bottom: 1px solid var(--lo);
+        flex-shrink: 0
+    }
+
+    .cap-bar span {
+        font-size: 12px
+    }
+
+    .cap-body {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        background: #fff
+    }
+
+    .cap-grid {
+        display: grid;
+        grid-template-columns:repeat(auto-fill, minmax(100px, 1fr));
+        gap: 4px;
+        padding: 6px
+    }
+
+    .cap-grid img {
+        width: 100%;
+        aspect-ratio: 4/3;
+        object-fit: cover;
+        cursor: pointer;
+        border: 2px solid var(--face)
+    }
+
+    .cap-grid img:active, .cap-grid img:hover {
+        border-color: var(--active)
+    }
+
+    .cap-empty {
+        grid-column: 1/-1;
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--lo);
+        font-size: 12px;
+        line-height: 1.6
+    }
+
+    /* Lightbox window */
+    .viewer {
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        background: rgba(0, 0, 128, .75);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 4px
+    }
+
+    .viewer.on {
+        display: flex
+    }
+
+    .viewer .window {
+        max-width: 96vw;
+        max-height: 92dvh;
+        display: flex;
+        flex-direction: column;
+        min-width: 280px
+    }
+
+    .viewer .window-body {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: #000;
+        padding: 2px !important
+    }
+
+    .viewer .window-body img {
+        max-width: 100%;
+        max-height: calc(80dvh - 80px);
+        object-fit: contain
+    }
+
+    .viewer-nav {
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        background: var(--face);
+        width: 100%;
+        justify-content: center;
+        align-items: center
+    }
+
+    .viewer-nav span {
+        flex: 1;
+        font-size: 11px;
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap
+    }
+
+    .viewer-nav button {
+        min-height: 26px;
+        font-size: 11px;
+        padding: 2px 10px
+    }
+
+    /* ════════════════ LOGIN ════════════════ */
+    .login-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 999;
+        background: #008080;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px
+    }
+
+    .login-bg.off {
+        display: none
+    }
+
+    .login-win {
+        width: min(380px, 90vw)
+    }
+
+    .login-win .window-body {
+        padding: 16px !important
+    }
+
+    .login-icon {
+        text-align: center;
+        margin-bottom: 8px
+    }
+
+    .login-icon img, .login-icon svg {
+        width: 48px;
+        height: 48px
+    }
+
+    .login-icon-txt {
+        font-size: 40px;
+        line-height: 1
+    }
+
+    .login-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0
+    }
+
+    .login-row label {
+        width: 72px;
+        text-align: right;
+        font-size: 12px;
+        flex-shrink: 0
+    }
+
+    .login-row input {
+        flex: 1;
+        height: 24px;
+        font-size: 13px;
+        padding: 2px 6px
+    }
+
+    .login-btns {
+        display: flex;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-top: 14px
+    }
+
+    .login-btns button {
+        min-width: 80px;
+        min-height: 28px;
+        font-size: 12px
+    }
+
+    .login-err {
+        color: #c00;
+        font-size: 11px;
+        text-align: center;
+        min-height: 16px;
+        margin-top: 4px
+    }
+
+    .login-hint {
+        font-size: 10px;
+        color: #808080;
+        text-align: center
+    }
+
+    @media (max-width: 480px) {
+        .login-win {
+            width: 92vw
+        }
+
+        .login-row input {
+            height: 32px;
+            font-size: 15px
+        }
+
+        .login-btns button {
+            min-height: 36px;
+            font-size: 14px;
+            min-width: 90px
+        }
+
+        .login-row label {
+            font-size: 14px
+        }
+    }
+
+    /* ════════════════ SYSTEM INFO ════════════════ */
+    .sys-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden
+    }
+
+    .sys-body .sunken-panel {
+        flex: 1;
+        margin: 4px;
+        overflow: hidden;
+        display: flex
+    }
+
+    .term {
+        flex: 1;
+        overflow-y: auto;
+        background: #000;
+        color: #00ff00;
+        font: 13px "Fixedsys Excelsior", "Courier New", monospace;
+        padding: 10px;
+        margin: 0;
+        white-space: pre-wrap;
+        line-height: 1.5;
+        -webkit-overflow-scrolling: touch
+    }
+
+    /* ════════════════ STATUS BAR ════════════════ */
+    .app-status {
+        flex-shrink: 0;
+        margin: 2px 4px 4px
+    }
+
+    .app-status .status-bar {
+        margin: 0
+    }
+
+    .app-status .status-bar-field {
+        font-size: 11px;
+        padding: 2px 6px
+    }
+
+    /* ════════════════ TASKBAR ════════════════ */
+    .taskbar {
+        height: 30px;
+        background: var(--face);
+        border-top: 2px solid var(--hi);
+        display: flex;
+        align-items: center;
+        padding: 1px 3px;
+        gap: 2px;
+        flex-shrink: 0
+    }
+
+    .t-start {
+        font-weight: bold;
+        font-size: 11px;
+        padding: 1px 5px;
+        height: 24px
+    }
+
+    .t-sep {
+        width: 2px;
+        height: 18px;
+        border-left: 1px solid var(--lo);
+        border-right: 1px solid var(--hi);
+        margin: 0 1px
+    }
+
+    .t-win {
+        font-size: 10px;
+        height: 22px;
+        padding: 1px 5px;
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap
+    }
+
+    .t-win.on {
+        box-shadow: inset 1px 1px 1px var(--lo)
+    }
+
+    .t-space {
+        flex: 1
+    }
+
+    .t-tray {
+        font-size: 10px;
+        padding: 2px 6px;
+        border: 1px solid;
+        border-color: var(--lo) var(--hi) var(--hi) var(--lo);
+        display: flex;
+        gap: 6px
+    }
+
+    /* ════════════════ RESPONSIVE ════════════════ */
+    @media (max-width: 480px) {
+        .tab-row menu li {
+            padding: 6px 12px;
+            font-size: 12px
+        }
+
+        .tbar {
+            gap: 4px;
+            padding: 4px 6px
+        }
+
+        .tbar button {
+            min-height: 36px;
+            font-size: 13px;
+            padding: 4px 10px
+        }
+
+        .tbar select {
+            min-height: 34px;
+            font-size: 13px
+        }
+
+        .upload-section {
+            flex-direction: column;
+            gap: 4px
+        }
+
+        .upload-btn {
+            width: 100%;
+            min-height: 48px;
+            font-size: 16px !important;
+            padding: 8px 20px
+        }
+
+        .upload-msg {
+            text-align: center;
+            font-size: 13px
+        }
+
+        .lens-btns button {
+            min-height: 36px;
+            font-size: 12px;
+            padding: 4px 12px
+        }
+
+        .viewer-nav button {
+            min-height: 34px;
+            padding: 4px 12px
+        }
+
+        .cap-grid {
+            grid-template-columns:repeat(3, 1fr)
+        }
+
+        .taskbar {
+            height: 34px
+        }
+
+        .t-start {
+            height: 28px;
+            font-size: 12px
+        }
+    }
+
+    @media (min-width: 600px) {
+        .cap-grid {
+            grid-template-columns:repeat(auto-fill, minmax(130px, 1fr))
+        }
+    }
+
+    @media (min-width: 900px) {
+        .cap-grid {
+            grid-template-columns:repeat(auto-fill, minmax(160px, 1fr))
+        }
+
+        .screen {
+            margin: 6px
+        }
+    }
+
+    @supports (padding:max(0px)) {
+        .taskbar {
+            padding-bottom: max(1px, env(safe-area-inset-bottom))
+        }
+    }
 </style>
 </head>
 <body>
-<div id="app">
-  <div id="main">
-    <!-- LIVE -->
-    <div class="panel on" id="p-live">
-      <div class="feed"><img id="feed" alt="CRT"></div>
-      <div id="overlay">NO SIGNAL</div>
-      <div class="filters">
-        <label>FX</label>
-        <select id="fx">
-          <option value="none">OFF</option>
-          <option value="brightness(1.5)">BRI+</option>
-          <option value="brightness(2)">BRI++</option>
-          <option value="contrast(1.5)">CON+</option>
-          <option value="contrast(2)">CON++</option>
-          <option value="grayscale(1)">GRAY</option>
-          <option value="invert(1)">INV</option>
-          <option value="saturate(2)">SAT+</option>
-          <option value="hue-rotate(90deg)">HUE90</option>
-          <option value="hue-rotate(180deg)">HUE180</option>
-          <option value="brightness(1.5) contrast(1.5)">BRI+CON</option>
-        </select>
-        <label>BRI</label>
-        <input type="range" id="bri" min="50" max="300" value="100">
-        <span class="fv" id="bri-v">100</span>
-        <label>CON</label>
-        <input type="range" id="con" min="50" max="300" value="100">
-        <span class="fv" id="con-v">100</span>
-      </div>
+<!-- Login overlay -->
+<div class="login-bg" id="login-bg">
+    <div class="window login-win">
+        <div class="title-bar">
+            <div class="title-bar-text">Log On to PhosphorOS</div>
+        </div>
+        <div class="window-body">
+            <div class="login-icon"><span class="login-icon-txt">&#128274;</span></div>
+            <p style="font-size:12px;text-align:center;margin:0 0 12px">Enter your credentials to access the CRT
+                monitor.</p>
+            <div class="login-row"><label for="l-user">User name:</label><input autocapitalize="off" autocomplete="username"
+                                                                                id="l-user"
+                                                                                spellcheck="false" type="text">
+            </div>
+            <div class="login-row"><label for="l-pass">Password:</label><input autocomplete="current-password" id="l-pass"
+                                                                               type="password"></div>
+            <div class="login-err" id="l-err"></div>
+            <div class="login-btns">
+                <button id="l-ok">OK</button>
+                <button disabled id="l-cancel">Cancel</button>
+            </div>
+        </div>
     </div>
-    <!-- GALLERY -->
-    <div class="panel" id="p-gallery">
-      <div class="gallery" id="gal"></div>
-    </div>
-    <!-- STATUS -->
-    <div class="panel" id="p-status">
-      <pre class="readout" id="readout">loading...</pre>
+    <p class="login-hint">PhosphorOS &mdash; CRT Signal Monitor v1.0</p>
+</div>
+
+<div class="desktop" id="desktop" style="display:none">
+    <div class="desk-area">
+        <div class="window app">
+            <div class="title-bar">
+                <div class="title-bar-text">PhosphorOS — CRT Signal Monitor</div>
+                <div class="title-bar-controls">
+                    <button aria-label="Minimize"></button>
+                    <button aria-label="Maximize"></button>
+                    <button aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="window-body">
+
+                <div class="tab-row">
+                    <menu role="tablist">
+                        <li aria-selected="true" id="t-live" role="tab">Live View</li>
+                        <li id="t-caps" role="tab">Captures</li>
+                        <li id="t-sys" role="tab">System Info</li>
+                    </menu>
+                </div>
+
+                <div class="panel-area">
+
+                    <!-- ════ LIVE VIEW ════ -->
+                    <div class="pane on" id="p-live">
+                        <div class="live-pane">
+                            <!-- Upload: first thing visible, above the feed -->
+                            <div class="upload-section">
+                                <button class="upload-btn" id="btn-upload">&#128228; Send Image to CRT</button>
+                                <input accept="image/*,.heic,.heif" id="file-upload" style="display:none" type="file">
+                                <span class="upload-msg" id="upload-status"></span>
+                                <div class="upload-prog-wrap" id="upload-prog" style="display:none">
+                                    <div class="progress-indicator segmented"><span class="progress-indicator-bar"
+                                                                                    id="upload-bar"
+                                                                                    style="width:0%"></span></div>
+                                </div>
+                            </div>
+
+                            <div class="screen">
+                                <canvas id="feed"></canvas>
+                                <div id="ov">No Signal</div>
+                            </div>
+                            <div class="tbar">
+                                <button id="btn-snap">Snapshot</button>
+                                <button id="btn-rec">Record</button>
+                                <select id="dur">
+                                    <option value="3">3 sec</option>
+                                    <option selected value="5">5 sec</option>
+                                    <option value="7">7 sec</option>
+                                    <option value="10">10 sec</option>
+                                </select>
+                                <div class="div"></div>
+                                <button id="btn-adj">Adjust...</button>
+                                <button id="btn-rst">Reset All</button>
+                            </div>
+                            <div class="rec-wrap" id="rec-wrap">
+                                <div class="progress-indicator segmented"><span class="progress-indicator-bar"
+                                                                                id="rec-bar" style="width:0%"></span>
+                                </div>
+                            </div>
+
+                            <fieldset class="lens-fs">
+                                <legend>Image Lens</legend>
+                                <div class="lens-group"><span class="lens-label">Enhance</span>
+                                    <div class="lens-btns" id="g-enh"></div>
+                                </div>
+                                <div class="lens-group"><span class="lens-label">Color</span>
+                                    <div class="lens-btns" id="g-col"></div>
+                                </div>
+                                <div class="lens-group"><span class="lens-label">Effect</span>
+                                    <div class="lens-btns" id="g-fx"></div>
+                                </div>
+                            </fieldset>
+
+                            <fieldset class="adj-fs" hidden id="adj-fs">
+                                <legend>Custom Adjustments</legend>
+                                <div class="adj-row"><label>Bright</label><input id="sl-bri" max="250" min="50"
+                                                                                 type="range" value="100"><span class="val"
+                                                                                                             id="sv-bri">100</span>
+                                </div>
+                                <div class="adj-row"><label>Contr</label><input id="sl-con" max="250" min="50"
+                                                                                type="range" value="100"><span class="val"
+                                                                                                            id="sv-con">100</span>
+                                </div>
+                                <div class="adj-row"><label>Satur</label><input id="sl-sat" max="300" min="0"
+                                                                                type="range" value="100"><span class="val"
+                                                                                                            id="sv-sat">100</span>
+                                </div>
+                                <div class="adj-row"><label>Hue</label><input id="sl-hue" max="360" min="0" type="range"
+                                                                              value="0"><span class="val"
+                                                                                              id="sv-hue">0</span></div>
+                                <div class="adj-row"><label>Blur</label><input id="sl-blur" max="10" min="0"
+                                                                               step="0.5" type="range" value="0"><span
+                                        class="val" id="sv-blur">0</span></div>
+                            </fieldset>
+                        </div>
+                    </div>
+
+                    <!-- ════ CAPTURES ════ -->
+                    <div class="pane" id="p-caps">
+                        <div class="cap-bar"><span id="cap-n">0 captures</span>
+                            <div style="flex:1"></div>
+                            <button id="btn-ref">Refresh</button>
+                        </div>
+                        <div class="cap-body">
+                            <div class="cap-grid" id="gal"></div>
+                        </div>
+                    </div>
+
+                    <!-- ════ SYSTEM INFO ════ -->
+                    <div class="pane" id="p-sys">
+                        <div class="sys-body">
+                            <div class="sunken-panel">
+                                <pre class="term" id="term">C:\PHOSPHOROS> _</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="app-status">
+                    <div class="status-bar">
+                        <p class="status-bar-field" id="sb-c">Connecting...</p>
+                        <p class="status-bar-field" id="sb-s">NTSC</p>
+                        <p class="status-bar-field" id="sb-f">Frames: 0</p>
+                    </div>
+                </div>
+
+            </div>
     </div>
   </div>
 
   <!-- Lightbox -->
-  <div class="lb" id="lb">
-    <img id="lb-img">
-    <div class="lb-bar">
-      <button class="btn" id="lb-p">&lt;</button>
-      <span id="lb-n"></span>
-      <button class="btn" id="lb-x">X</button>
-      <button class="btn red" id="lb-d">DEL</button>
-      <button class="btn" id="lb-nx">&gt;</button>
+    <div class="viewer" id="vw">
+        <div class="window" style="width:min(96vw,720px)">
+            <div class="title-bar">
+                <div class="title-bar-text" id="vw-t">Image Viewer</div>
+                <div class="title-bar-controls">
+                    <button aria-label="Close" id="vw-x"></button>
+                </div>
+            </div>
+            <div class="window-body">
+                <img id="vw-img">
+                <div class="viewer-nav">
+                    <button id="vw-p">&laquo; Prev</button>
+                    <span id="vw-n">1 of 1</span>
+                    <button id="vw-d" style="color:#c00">Delete</button>
+                    <button id="vw-nx">Next &raquo;</button>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <nav>
-    <button class="on" data-p="live">LIVE</button>
-    <button data-p="gallery">GALLERY</button>
-    <button data-p="status">STATUS</button>
-  </nav>
-  <div class="st">
-    <span id="conn">--</span>
-    <span>PHOSPHOR<small>OS</small></span>
-    <span id="fc">0</span>
+    <div class="taskbar">
+        <button class="t-start"><b>Start</b></button>
+        <div class="t-sep"></div>
+        <button class="t-win on">PhosphorOS</button>
+        <div class="t-space"></div>
+        <div class="t-tray"><span id="t-sig">LIVE</span><span id="t-clk">00:00</span></div>
   </div>
 </div>
 
 <script>
 (function(){
-  var feed=document.getElementById('feed'),ov=document.getElementById('overlay');
-  var conn=document.getElementById('conn'),fc=document.getElementById('fc');
-  var fx=document.getElementById('fx'),bri=document.getElementById('bri'),con=document.getElementById('con');
-  var briV=document.getElementById('bri-v'),conV=document.getElementById('con-v');
-  var gal=document.getElementById('gal');
-  var lb=document.getElementById('lb'),lbImg=document.getElementById('lb-img'),lbN=document.getElementById('lb-n');
-  var readout=document.getElementById('readout');
-  var frames=0,items=[],lbIdx=0,activeTab='live',statusTmr=null;
+    var $ = function (id) {
+        return document.getElementById(id)
+    };
 
-  /* ── Tabs ──────────────────────────────────── */
-  document.querySelectorAll('nav button').forEach(function(b){
-    b.addEventListener('click',function(){
-      var t=b.dataset.p;
-      document.querySelectorAll('nav button').forEach(function(x){x.classList.remove('on')});
-      document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('on')});
-      b.classList.add('on');
-      document.getElementById('p-'+t).classList.add('on');
-      activeTab=t;
-      if(t==='gallery')loadGallery();
-      if(t==='status'){loadStatus();statusTmr=setInterval(function(){if(activeTab==='status')loadStatus()},5000)}
-      else{clearInterval(statusTmr)}
-    });
-  });
+    /* ── Auth ──────────────────────────────────────────────────────── */
+    var authKey = sessionStorage.getItem('crt_auth') || '';
 
-  /* ── Live feed (fetch + blob, works on ALL browsers) ── */
-  var polling=false;
-  function startFeed(){
-    if(polling)return;polling=true;
-    conn.textContent='LIVE';conn.className='ok';
-    ov.classList.add('off');
-    (function poll(){
-      fetch('/api/snapshot?ts='+Date.now(),{cache:'no-store'})
-        .then(function(r){if(!r.ok)throw r;return r.blob()})
-        .then(function(b){
-          var u=URL.createObjectURL(b);
-          feed.onload=function(){URL.revokeObjectURL(u);frames++;fc.textContent=frames;setTimeout(poll,300)};
-          feed.onerror=function(){URL.revokeObjectURL(u);setTimeout(poll,1000)};
-          feed.src=u;
-        })
-        .catch(function(){conn.textContent='RETRY';conn.className='err';setTimeout(poll,2000)});
-    })();
-  }
-
-  /* ── CSS Filters ───────────────────────────── */
-  fx.addEventListener('change',applyFilter);
-  bri.addEventListener('input',function(){briV.textContent=bri.value;applyFilter()});
-  con.addEventListener('input',function(){conV.textContent=con.value;applyFilter()});
-  function applyFilter(){
-    var f=[];
-    if(fx.value!=='none')f.push(fx.value);
-    if(bri.value!=='100')f.push('brightness('+bri.value/100+')');
-    if(con.value!=='100')f.push('contrast('+con.value/100+')');
-    feed.style.filter=f.length?f.join(' '):'none';
-  }
-
-  /* ── Gallery ───────────────────────────────── */
-  function loadGallery(){
-    fetch('/api/gallery?ts='+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
-      d.sort(function(a,b){return b.mtime-a.mtime});
-      items=d;renderGal();
-    }).catch(function(){gal.innerHTML='<p class="gallery-empty">ERROR</p>'});
-  }
-  function renderGal(){
-    gal.innerHTML='';
-    if(!items.length){gal.innerHTML='<p class="gallery-empty">NO CAPTURES</p>';return}
-    items.forEach(function(it,i){
-      var img=document.createElement('img');
-      img.src='/captures/'+it.file+'?v='+(it.mtime||0);img.alt=it.file;img.loading='lazy';
-      img.addEventListener('click',function(){openLb(i)});
-      gal.appendChild(img);
-    });
-  }
-
-  /* ── Lightbox ──────────────────────────────── */
-  function openLb(i){lbIdx=i;updLb();lb.classList.add('on')}
-  function closeLb(){lb.classList.remove('on')}
-  function updLb(){lbImg.src='/captures/'+items[lbIdx].file+'?v='+(items[lbIdx].mtime||0);lbN.textContent=items[lbIdx].file}
-  document.getElementById('lb-p').addEventListener('click',function(){if(lbIdx>0){lbIdx--;updLb()}});
-  document.getElementById('lb-nx').addEventListener('click',function(){if(lbIdx<items.length-1){lbIdx++;updLb()}});
-  document.getElementById('lb-x').addEventListener('click',closeLb);
-  lb.addEventListener('click',function(e){if(e.target===lb)closeLb()});
-  document.getElementById('lb-d').addEventListener('click',function(){
-    fetch('/api/gallery/'+encodeURIComponent(items[lbIdx].file),{method:'DELETE'})
-      .then(function(r){return r.json()}).then(function(d){if(d.ok){closeLb();loadGallery()}});
-  });
-  document.addEventListener('keydown',function(e){
-    if(!lb.classList.contains('on'))return;
-    if(e.key==='ArrowLeft'&&lbIdx>0){lbIdx--;updLb()}
-    if(e.key==='ArrowRight'&&lbIdx<items.length-1){lbIdx++;updLb()}
-    if(e.key==='Escape')closeLb();
-  });
-  /* Swipe */
-  var tx=0;
-  lbImg.addEventListener('touchstart',function(e){tx=e.changedTouches[0].clientX},{passive:true});
-  lbImg.addEventListener('touchend',function(e){
-    var dx=e.changedTouches[0].clientX-tx;
-    if(Math.abs(dx)<50)return;
-    if(dx<0&&lbIdx<items.length-1){lbIdx++;updLb()}
-    if(dx>0&&lbIdx>0){lbIdx--;updLb()}
-  },{passive:true});
-
-  /* ── Status ────────────────────────────────── */
-  function loadStatus(){
-    fetch('/api/status?ts='+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
-      var s='';
-      s+='  VIDEO:    '+(d.video_standard||'N/A')+'\n';
-      s+='  COLOR:    '+(d.color_enabled?'ON':'OFF')+'\n';
-      s+='  LINES:    '+(d.active_lines||0)+'\n';
-      s+='  SAMPLE:   '+fmtHz(d.sample_rate_hz||0)+'\n';
-      s+='  DEVICE:   '+(d.capture_device||'N/A')+'\n';
-      s+='  CAPTURE:  '+(d.capture_resolution||'N/A')+'\n';
-      s+='  UPTIME:   '+fmtUp(d.uptime_s||0)+'\n';
-      readout.textContent=s+'\n> READY_';
-    }).catch(function(e){readout.textContent='ERROR: '+e.message});
-  }
-  function fmtHz(h){return h>=1e6?(h/1e6).toFixed(3)+' MHz':h>=1e3?(h/1e3).toFixed(1)+' kHz':h+' Hz'}
-  function fmtUp(s){s=Math.floor(s);return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m '+(s%60)+'s'}
-
-  /* ── Boot ──────────────────────────────────── */
-  startFeed();
-  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||
-            (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  if('serviceWorker' in navigator){
-    if(isIOS){
-      navigator.serviceWorker.getRegistrations().then(function(rs){
-        rs.forEach(function(r){r.unregister()});
-      });
-    }else{
-      navigator.serviceWorker.register('/sw.js');
+    function authHeaders() {
+        return authKey ? {Authorization: 'Basic ' + authKey} : {}
     }
-  }
+
+    function afetch(url, opts) {
+        opts = opts || {};
+        opts.headers = Object.assign(authHeaders(), opts.headers || {});
+        return fetch(url, opts);
+    }
+
+    function tryLogin(user, pass) {
+        var key = btoa(user + ':' + pass);
+        return fetch('/api/status', {headers: {Authorization: 'Basic ' + key}}).then(function (r) {
+            if (r.ok) {
+                authKey = key;
+                sessionStorage.setItem('crt_auth', key);
+                return true
+            }
+            return false;
+        });
+    }
+
+    function showApp() {
+        $('login-bg').classList.add('off');
+        $('desktop').style.display = '';
+        boot()
+    }
+
+    function showLogin() {
+        $('login-bg').classList.remove('off');
+        $('desktop').style.display = 'none';
+        $('l-user').focus()
+    }
+
+    /* Check existing session */
+    if (authKey) {
+        fetch('/api/status', {headers: {Authorization: 'Basic ' + authKey}}).then(function (r) {
+            if (r.ok) showApp(); else {
+                authKey = '';
+                sessionStorage.removeItem('crt_auth');
+                showLogin()
+            }
+        }).catch(function () {
+            showLogin()
+        });
+    } else {
+        showLogin()
+    }
+
+    /* Login form */
+    function doLogin() {
+        var u = $('l-user').value.trim(), p = $('l-pass').value;
+        if (!u || !p) {
+            $('l-err').textContent = 'Enter username and password';
+            return
+        }
+        $('l-ok').disabled = true;
+        $('l-err').textContent = 'Verifying...';
+        tryLogin(u, p).then(function (ok) {
+            $('l-ok').disabled = false;
+            if (ok) {
+                $('l-err').textContent = '';
+                showApp()
+            } else {
+                $('l-err').textContent = 'Invalid credentials';
+                $('l-pass').value = '';
+                $('l-pass').focus()
+            }
+        }).catch(function () {
+            $('l-ok').disabled = false;
+            $('l-err').textContent = 'Connection error'
+        });
+    }
+
+    $('l-ok').addEventListener('click', doLogin);
+    $('l-pass').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') doLogin()
+    });
+    $('l-user').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') $('l-pass').focus()
+    });
+
+    /* ── App boot (called after login) ─────────────────────────────── */
+    function boot() {
+        var feed = $('feed'), ov = $('ov'), sbC = $('sb-c'), sbS = $('sb-s'), sbF = $('sb-f');
+        var gal = $('gal'), capN = $('cap-n');
+        var vw = $('vw'), vwImg = $('vw-img'), vwN = $('vw-n'), vwT = $('vw-t');
+        var term = $('term'), adjFs = $('adj-fs');
+        var tSig = $('t-sig'), tClk = $('t-clk');
+        var fr = 0, items = [], li = 0, tab = 'live', stTmr = null, recTmr = null;
+
+        /* Clock */
+        function clk() {
+            var d = new Date();
+            tClk.textContent = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0')
+        }
+
+        clk();
+        setInterval(clk, 15000);
+
+        /* Tabs */
+        var TM = {live: ['t-live', 'p-live'], caps: ['t-caps', 'p-caps'], sys: ['t-sys', 'p-sys']};
+        Object.keys(TM).forEach(function (k) {
+            $(TM[k][0]).addEventListener('click', function () {
+                Object.keys(TM).forEach(function (t) {
+                    $(TM[t][0]).setAttribute('aria-selected', String(t === k));
+                    $(TM[t][1]).classList.toggle('on', t === k)
+                });
+                tab = k;
+                if (k === 'caps') loadGal();
+                if (k === 'sys') {
+                    loadSys();
+                    stTmr = setInterval(function () {
+                        if (tab === 'sys') loadSys()
+                    }, 4000)
+                } else clearInterval(stTmr);
+            })
+        });
+
+        /* Lenses */
+        var L = [
+            ['Off', 'none', 'enh'], ['CRT', 'contrast(1.3) brightness(1.1) saturate(1.2)', 'enh'],
+            ['Phosphor', 'brightness(1.4) contrast(1.6) sepia(.15) saturate(1.3)', 'enh'],
+            ['HDR', 'contrast(1.6) brightness(1.15) saturate(1.4)', 'enh'],
+            ['Film', 'sepia(.2) contrast(1.2) brightness(.95) saturate(.9)', 'enh'],
+            ['B/W', 'grayscale(1) contrast(1.4)', 'col'],
+            ['Cool', 'hue-rotate(30deg) saturate(.8) brightness(1.1)', 'col'],
+            ['Warm', 'sepia(.3) saturate(1.5) brightness(1.05)', 'col'],
+            ['Neon', 'saturate(3) brightness(1.3) contrast(1.5)', 'col'],
+            ['Retro', 'sepia(.8) contrast(1.3) brightness(.9)', 'col'],
+            ['Night', 'brightness(2) contrast(1.5) saturate(0) hue-rotate(120deg)', 'fx'],
+            ['X-Ray', 'invert(1) brightness(1.2) contrast(1.5)', 'fx'],
+            ['Thermal', 'invert(.8) hue-rotate(180deg) saturate(3) contrast(1.3)', 'fx'],
+            ['Vapor', 'hue-rotate(270deg) saturate(2) brightness(1.2)', 'fx'],
+            ['Cyber', 'hue-rotate(90deg) contrast(1.5) brightness(1.2) saturate(2)', 'fx'],
+            ['Custom', '__custom__', 'fx']
+        ];
+        var gMap = {enh: $('g-enh'), col: $('g-col'), fx: $('g-fx')};
+        var cl = 0, allLB = [];
+        L.forEach(function (l, i) {
+            var b = document.createElement('button');
+            b.textContent = l[0];
+            if (i === 0) b.classList.add('sel');
+            b.addEventListener('click', function () {
+                cl = i;
+                allLB.forEach(function (x) {
+                    x.classList.remove('sel')
+                });
+                b.classList.add('sel');
+                adjFs.hidden = (l[0] !== 'Custom');
+                applyF();
+            });
+            gMap[l[2]].appendChild(b);
+            allLB.push(b);
+        });
+
+        /* Sliders */
+        var sl = {b: $('sl-bri'), c: $('sl-con'), s: $('sl-sat'), h: $('sl-hue'), u: $('sl-blur')};
+        var sv = {b: $('sv-bri'), c: $('sv-con'), s: $('sv-sat'), h: $('sv-hue'), u: $('sv-blur')};
+        Object.keys(sl).forEach(function (k) {
+            sl[k].addEventListener('input', function () {
+                sv.b.textContent = sl.b.value;
+                sv.c.textContent = sl.c.value;
+                sv.s.textContent = sl.s.value;
+                sv.h.textContent = sl.h.value;
+                sv.u.textContent = sl.u.value;
+                cl = L.length - 1;
+                allLB.forEach(function (x, i) {
+                    x.classList.toggle('sel', i === cl)
+                });
+                adjFs.hidden = false;
+                applyF();
+            })
+        });
+
+        function applyF() {
+            if (L[cl][1] === 'none') {
+                feed.style.filter = 'none';
+                return
+            }
+            if (L[cl][1] === '__custom__') {
+                var f = 'brightness(' + sl.b.value / 100 + ') contrast(' + sl.c.value / 100 + ') saturate(' + sl.s.value / 100 + ') hue-rotate(' + sl.h.value + 'deg)';
+                if (parseFloat(sl.u.value) > 0) f += ' blur(' + sl.u.value + 'px)';
+                feed.style.filter = f;
+                return;
+            }
+            feed.style.filter = L[cl][1];
+        }
+
+        $('btn-adj').addEventListener('click', function () {
+            if (adjFs.hidden) {
+                adjFs.hidden = false;
+                cl = L.length - 1;
+                allLB.forEach(function (x, i) {
+                    x.classList.toggle('sel', i === cl)
+                })
+            } else adjFs.hidden = true;
+        });
+        $('btn-rst').addEventListener('click', function () {
+            sl.b.value = 100;
+            sl.c.value = 100;
+            sl.s.value = 100;
+            sl.h.value = 0;
+            sl.u.value = 0;
+            sv.b.textContent = '100';
+            sv.c.textContent = '100';
+            sv.s.textContent = '100';
+            sv.h.textContent = '0';
+            sv.u.textContent = '0';
+            cl = 0;
+            feed.style.filter = 'none';
+            adjFs.hidden = true;
+            allLB.forEach(function (x, i) {
+                x.classList.toggle('sel', i === 0)
+            });
+        });
+
+        /* Feed — canvas + createImageBitmap: decode off-thread, drawImage = zero flicker */
+        var feedCtx = feed.getContext('2d'), polling = false, feedW = 0, feedH = 0;
+
+        function startFeed() {
+            if (polling) return;
+            polling = true;
+            sbC.textContent = 'Connected';
+            ov.classList.add('off');
+            tSig.textContent = 'LIVE';
+            (function poll() {
+                afetch('/api/snapshot?t=' + Date.now(), {cache: 'no-store'})
+                    .then(function (r) {
+                        if (!r.ok) throw r;
+                        return r.blob()
+                    })
+                    .then(function (b) {
+                        return createImageBitmap(b)
+                    })
+                    .then(function (bmp) {
+                        if (feedW !== bmp.width || feedH !== bmp.height) {
+                            feed.width = feedW = bmp.width;
+                            feed.height = feedH = bmp.height
+                        }
+                        feedCtx.drawImage(bmp, 0, 0);
+                        bmp.close();
+                        fr++;
+                        sbF.textContent = 'Frames: ' + fr;
+                        sbC.textContent = 'Connected';
+                        tSig.textContent = 'LIVE';
+                        setTimeout(poll, 150);
+                    })
+                    .catch(function () {
+                        sbC.textContent = 'Disconnected';
+                        tSig.textContent = 'OFF';
+                        setTimeout(poll, 2000)
+                    });
+            })();
+        }
+
+        /* Snap */
+        $('btn-snap').addEventListener('click', function () {
+            var b = $('btn-snap');
+            b.disabled = true;
+            b.textContent = 'Saving...';
+            afetch('/api/capture', {method: 'POST'}).then(function (r) {
+                return r.json()
+            }).then(function (d) {
+                b.textContent = d.ok ? 'Saved!' : 'Error';
+                setTimeout(function () {
+                    b.textContent = 'Snapshot';
+                    b.disabled = false
+                }, 1200);
+            }).catch(function () {
+                b.textContent = 'Error';
+                setTimeout(function () {
+                    b.textContent = 'Snapshot';
+                    b.disabled = false
+                }, 1200)
+            });
+        });
+
+        /* Record */
+        var rec = false, recT = 0, recS = 0;
+        $('btn-rec').addEventListener('click', function () {
+            if (rec) return;
+            var d = parseInt($('dur').value);
+            rec = true;
+            $('btn-rec').disabled = true;
+            $('btn-rec').textContent = 'Recording...';
+            recT = d;
+            recS = Date.now();
+            $('rec-bar').style.width = '0%';
+            $('rec-wrap').style.display = 'block';
+            afetch('/api/record?duration=' + d, {method: 'POST'}).then(function (r) {
+                return r.json()
+            }).then(function (d) {
+                if (!d.ok) {
+                    sRec();
+                    return
+                }
+                recTmr = setInterval(pRec, 400);
+            }).catch(sRec);
+        });
+
+        function pRec() {
+            $('rec-bar').style.width = Math.min(100, (Date.now() - recS) / 1000 / recT * 100) + '%';
+            afetch('/api/record', {cache: 'no-store'}).then(function (r) {
+                return r.json()
+            }).then(function (d) {
+                if (!d.recording) {
+                    sRec();
+                    return
+                }
+                $('btn-rec').textContent = 'Rec: ' + d.frames_saved;
+            }).catch(sRec);
+        }
+
+        function sRec() {
+            rec = false;
+            clearInterval(recTmr);
+            $('btn-rec').disabled = false;
+            $('btn-rec').textContent = 'Record';
+            $('rec-bar').style.width = '100%';
+            setTimeout(function () {
+                $('rec-wrap').style.display = 'none';
+                $('rec-bar').style.width = '0%'
+            }, 700);
+        }
+
+        /* Upload to CRT */
+        var btnUp = $('btn-upload'), fileUp = $('file-upload'), upSt = $('upload-status'), upPr = $('upload-prog'),
+            upBr = $('upload-bar');
+        btnUp.addEventListener('click', function (e) {
+            e.preventDefault();
+            fileUp.value = '';
+            fileUp.click()
+        });
+        fileUp.addEventListener('change', function () {
+            var f = fileUp.files[0];
+            if (!f) return;
+            var ok = f.type.indexOf('image') >= 0 || /\.(jpg|jpeg|png|gif|bmp|webp|heic|heif|tiff?)$/i.test(f.name);
+            if (!ok) {
+                upSt.textContent = 'Select an image';
+                return
+            }
+            if (f.size > 12 * 1024 * 1024) {
+                upSt.textContent = 'Max 12MB';
+                return
+            }
+            btnUp.disabled = true;
+            btnUp.textContent = 'Sending...';
+            upPr.style.display = 'block';
+            upBr.style.width = '5%';
+            upSt.textContent = f.name + ' (' + (f.size / 1048576).toFixed(1) + ' MB)';
+            var fd = new FormData();
+            fd.append('image', f);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload', true);
+            xhr.timeout = 30000;
+            if (authKey) xhr.setRequestHeader('Authorization', 'Basic ' + authKey);
+            xhr.upload.onprogress = function (e) {
+                if (e.lengthComputable) {
+                    var p = Math.round(e.loaded / e.total * 50);
+                    upBr.style.width = p + '%';
+                    upSt.textContent = 'Uploading ' + p + '%'
+                }
+            };
+            var pt;
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 3) {
+                    upBr.style.width = '50%';
+                    upSt.textContent = 'Sending to CRT...';
+                    pt = setInterval(function () {
+                        var w = parseInt(upBr.style.width) || 50;
+                        if (w < 95) upBr.style.width = (w + 2) + '%'; else clearInterval(pt)
+                    }, 300)
+                }
+            };
+            xhr.onload = function () {
+                clearInterval(pt);
+                var d;
+                try {
+                    d = JSON.parse(xhr.responseText)
+                } catch (e) {
+                    d = {error: 'Bad response'}
+                }
+                if (xhr.status === 200 && d.ok) {
+                    upBr.style.width = '100%';
+                    upSt.textContent = 'On the CRT!';
+                    btnUp.textContent = 'Done!'
+                } else {
+                    upBr.style.width = '0%';
+                    upSt.textContent = d.error || ('HTTP ' + xhr.status);
+                    btnUp.textContent = 'Failed'
+                }
+                setTimeout(upRst, 3500);
+            };
+            xhr.onerror = function () {
+                clearInterval(pt);
+                upSt.textContent = 'Network error';
+                btnUp.textContent = 'Failed';
+                setTimeout(upRst, 3500)
+            };
+            xhr.ontimeout = function () {
+                clearInterval(pt);
+                upSt.textContent = 'Timeout';
+                btnUp.textContent = 'Retry';
+                setTimeout(upRst, 3500)
+            };
+            xhr.send(fd);
+        });
+
+        function upRst() {
+            btnUp.innerHTML = '&#128228; Send Image to CRT';
+            btnUp.disabled = false;
+            upPr.style.display = 'none';
+            upSt.textContent = ''
+        }
+
+        /* Gallery */
+        $('btn-ref').addEventListener('click', loadGal);
+
+        function loadGal() {
+            afetch('/api/gallery?t=' + Date.now(), {cache: 'no-store'}).then(function (r) {
+                return r.json()
+            }).then(function (d) {
+                d.sort(function (a, b) {
+                    return b.mtime - a.mtime
+                });
+                items = d;
+                capN.textContent = d.length + ' capture' + (d.length !== 1 ? 's' : '');
+                rGal();
+            }).catch(function () {
+                gal.innerHTML = '<p class="cap-empty">Error loading captures</p>'
+            });
+        }
+
+        function rGal() {
+            gal.innerHTML = '';
+            if (!items.length) {
+                gal.innerHTML = '<p class="cap-empty">No captures yet.<br>Click <b>Snapshot</b> on the Live View tab to save a frame.</p>';
+                return
+            }
+            items.forEach(function (it, i) {
+                var img = document.createElement('img');
+                img.src = '/captures/' + it.file + '?v=' + (it.mtime || 0);
+                img.alt = it.file;
+                img.loading = 'lazy';
+                img.addEventListener('click', function () {
+                    oVw(i)
+                });
+                gal.appendChild(img);
+            });
+        }
+
+        /* Viewer */
+        function oVw(i) {
+            li = i;
+            uVw();
+            vw.classList.add('on')
+        }
+
+        function cVw() {
+            vw.classList.remove('on')
+        }
+
+        function uVw() {
+            if (!items[li]) return;
+            vwImg.src = '/captures/' + items[li].file + '?v=' + (items[li].mtime || 0);
+            vwT.textContent = 'Image Viewer — ' + items[li].file;
+            vwN.textContent = (li + 1) + ' of ' + items.length
+        }
+
+        $('vw-p').addEventListener('click', function () {
+            if (li > 0) {
+                li--;
+                uVw()
+            }
+        });
+        $('vw-nx').addEventListener('click', function () {
+            if (li < items.length - 1) {
+                li++;
+                uVw()
+            }
+        });
+        $('vw-x').addEventListener('click', cVw);
+        $('vw-d').addEventListener('click', function () {
+            afetch('/api/gallery/' + encodeURIComponent(items[li].file), {method: 'DELETE'}).then(function (r) {
+                return r.json()
+            }).then(function (d) {
+                if (d.ok) {
+                    items.splice(li, 1);
+                    if (li >= items.length) li = Math.max(0, items.length - 1);
+                    if (!items.length) {
+                        cVw();
+                        rGal()
+                    } else {
+                        uVw();
+                        rGal()
+                    }
+                }
+  });
+        });
+        vw.addEventListener('click', function (e) {
+            if (e.target === vw) cVw()
+        });
+        document.addEventListener('keydown', function (e) {
+            if (!vw.classList.contains('on')) return;
+            if (e.key === 'ArrowLeft' && li > 0) {
+                li--;
+                uVw()
+            }
+            if (e.key === 'ArrowRight' && li < items.length - 1) {
+                li++;
+                uVw()
+            }
+            if (e.key === 'Escape') cVw()
+        });
+        var tx = 0;
+        vwImg.addEventListener('touchstart', function (e) {
+            tx = e.changedTouches[0].clientX
+        }, {passive: true});
+        vwImg.addEventListener('touchend', function (e) {
+            var dx = e.changedTouches[0].clientX - tx;
+            if (Math.abs(dx) < 50) return;
+            if (dx < 0 && li < items.length - 1) {
+                li++;
+                uVw()
+            }
+            if (dx > 0 && li > 0) {
+                li--;
+                uVw()
+            }
+        }, {passive: true});
+
+        /* System */
+        function loadSys() {
+            afetch('/api/status?t=' + Date.now(), {cache: 'no-store'}).then(function (r) {
+                return r.json()
+            }).then(function (d) {
+                sbS.textContent = d.video_standard || '?';
+                term.textContent =
+                    'PhosphorOS v1.0 [CRT Signal Core]\n' +
+                    '(C) 2026 Gabriel Maia. All rights reserved.\n\n' +
+                    'C:\\PHOSPHOROS>status\n\n' +
+                    '  Video Standard .... ' + (d.video_standard || 'N/A') + '\n' +
+                    '  Color Burst ....... ' + (d.color_enabled ? 'Enabled' : 'Disabled') + '\n' +
+                    '  Active Lines ...... ' + (d.active_lines || 0) + '\n' +
+                    '  Sample Rate ....... ' + fH(d.sample_rate_hz || 0) + '\n' +
+                    '  Capture Device .... ' + (d.capture_device || 'N/A') + '\n' +
+                    '  Resolution ........ ' + (d.capture_resolution || 'N/A') + '\n' +
+                    '  System Uptime ..... ' + fU(d.uptime_s || 0) + '\n\n' +
+                    'C:\\PHOSPHOROS>_';
+            }).catch(function (e) {
+                term.textContent = 'C:\\PHOSPHOROS>ERROR: ' + e.message + '\n\nC:\\PHOSPHOROS>_'
+            });
+        }
+
+        function fH(h) {
+            return h >= 1e6 ? (h / 1e6).toFixed(3) + ' MHz' : h >= 1e3 ? (h / 1e3).toFixed(1) + ' kHz' : h + ' Hz'
+        }
+
+        function fU(s) {
+            s = Math.floor(s);
+            return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm ' + (s % 60) + 's'
+        }
+
+        /* Init */
+        startFeed();
+        loadGal();
+        loadSys();
+        if ('serviceWorker' in navigator && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)))
+            navigator.serviceWorker.getRegistrations().then(function (rs) {
+                rs.forEach(function (r) {
+                    r.unregister()
+                })
+            });
+
+    } /* end boot() */
 })();
 </script>
 </body>

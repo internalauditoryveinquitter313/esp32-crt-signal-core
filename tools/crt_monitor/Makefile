@@ -1,5 +1,6 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Wno-unused-parameter -O2 -std=gnu11 -D_GNU_SOURCE -I. -DMG_ENABLE_LINES=0
+CFLAGS = -Wall -Wextra -Wno-unused-parameter -O2 -std=gnu11 -D_GNU_SOURCE -I. -DMG_ENABLE_LINES=0 \
+         -DMG_MAX_RECV_SIZE='(15UL * 1024UL * 1024UL)'
 LDFLAGS = -lpthread
 
 SRCS = main.c capture.c routes.c status.c mongoose.c

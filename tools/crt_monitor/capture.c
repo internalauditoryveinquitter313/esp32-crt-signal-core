@@ -145,6 +145,13 @@ int capture_grab(capture_ctx_t *ctx, const uint8_t **jpg_buf, size_t *jpg_len)
         return -1;
     }
 
+    /* Bounds check — kernel can return any index */
+    if (buf.index >= (unsigned int) ctx->buffer_count) {
+        fprintf(stderr, "[capture] DQBUF returned invalid index %u (max %d)\n",
+                buf.index, ctx->buffer_count);
+        return -1;
+    }
+
     *jpg_buf = (const uint8_t *)ctx->buffers[buf.index].start;
     *jpg_len = buf.bytesused;
 

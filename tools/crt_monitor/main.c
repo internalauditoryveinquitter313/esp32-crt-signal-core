@@ -8,6 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <unistd.h>
 
 /* ------------------------------------------------------------------ */
 /* Globals                                                              */
@@ -98,6 +103,9 @@ int main(int argc, char *argv[])
     /* Signals */
     signal(SIGINT,  signal_handler);
     signal(SIGTERM, signal_handler);
+    /* Note: NOT using SIGCHLD=SIG_IGN because upload handler needs waitpid().
+     * Analyze handler's fire-and-forget children become zombies until server exits,
+     * but that's acceptable for a dev tool. */
 
     /* Camera — warn but continue so the server stays useful without HW */
     memset(&s_cap, 0, sizeof(s_cap));
@@ -111,6 +119,59 @@ int main(int argc, char *argv[])
         s_app.capture = &s_cap;
     }
 
+    /* Basic auth from environment (CRT_AUTH_USER / CRT_AUTH_PASS) */
+    s_app.auth_user = getenv("CRT_AUTH_USER");
+    s_app.auth_pass = getenv("CRT_AUTH_PASS");
+    if (s_app.auth_user && s_app.auth_pass) {
+        printf("  auth        : basic auth enabled (user=%s)\n", s_app.auth_user);
+    } else {
+        fprintf(stderr,
+                "WARNING: No authentication configured!\n"
+                "  Set CRT_AUTH_USER and CRT_AUTH_PASS env vars for basic auth.\n");
+    }
+
+    /* Serial device for image upload to ESP32 */
+    s_app.serial_fd = -1;
+    {
+        const char *esp_serial = getenv("CRT_SERIAL");
+        s_app.serial_device = esp_serial ? esp_serial : NULL;
+        if (s_app.serial_device) {
+            /* Open serial port with O_NONBLOCK to avoid blocking on DCD,
+             * then immediately disable DTR/RTS via ioctl to prevent ESP32 reset. */
+            int sfd = open(s_app.serial_device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+            if (sfd >= 0) {
+                /* Immediately clear DTR/RTS to prevent ESP32 reset */
+                int bits = TIOCM_DTR | TIOCM_RTS;
+                ioctl(sfd, TIOCMBIC, &bits);
+
+                /* Switch back to blocking mode */
+                int fl = fcntl(sfd, F_GETFL);
+                fcntl(sfd, F_SETFL, fl & ~O_NONBLOCK);
+
+                struct termios tty;
+                tcgetattr(sfd, &tty);
+                cfsetispeed(&tty, B115200);
+                cfsetospeed(&tty, B115200);
+                tty.c_cflag = B115200 | CS8 | CLOCAL | CREAD;
+                tty.c_cflag &= ~(tcflag_t) HUPCL;
+                tty.c_iflag = 0;
+                tty.c_oflag = 0;
+                tty.c_lflag = 0;
+                tty.c_cc[VMIN] = 0;
+                tty.c_cc[VTIME] = 100;
+                tcsetattr(sfd, TCSANOW, &tty);
+                tcflush(sfd, TCIOFLUSH);
+                s_app.serial_fd = sfd;
+                printf("  serial      : %s (fd=%d, kept open)\n", s_app.serial_device, sfd);
+            } else {
+                fprintf(stderr, "Warning: could not open serial %s: %s\n",
+                        s_app.serial_device, strerror(errno));
+            }
+        }
+    }
+    s_app.img2fb_path = getenv("CRT_IMG2FB");
+    if (!s_app.img2fb_path) s_app.img2fb_path = "../img2fb.py";
+
     /* Status module */
     status_init(device);
 
@@ -122,7 +183,11 @@ int main(int argc, char *argv[])
     mg_mgr_init(&mgr);
 
     char listen_url[64];
-    snprintf(listen_url, sizeof(listen_url), "http://0.0.0.0:%d", port);
+    /* Bind to localhost only — Cloudflare tunnel connects locally.
+     * No port is exposed externally. Use CRT_BIND=0.0.0.0 to override. */
+    const char *bind_addr = getenv("CRT_BIND");
+    if (!bind_addr) bind_addr = "127.0.0.1";
+    snprintf(listen_url, sizeof(listen_url), "http://%s:%d", bind_addr, port);
 
     struct mg_connection *lc = mg_http_listen(&mgr, listen_url,
                                                routes_handle, NULL);

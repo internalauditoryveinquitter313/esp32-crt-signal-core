@@ -2,7 +2,7 @@
   "use strict";
 
   /* ── State ─────────────────────────────────────────────────────── */
-  var ws = null, prevBlobUrl = null, frameCount = 0, activeTab = "live";
+    var ws = null, prevBlobUrl = null, frameCount = 0, activeTab = "live", wsFailCount = 0;
   var statusTimer = null;
   var galleryItems = [], lbIndex = 0;
 
@@ -264,10 +264,61 @@
       wsStatus.style.color = "#ff4141";
       feedOverlay.style.display = "flex";
       feedOverlay.textContent = "RECONNECTING...";
+        wsFailCount++;
+        if (wsFailCount >= 3) {
+            feedOverlay.textContent = "POLLING MODE";
+            startPollingFallback();
+            return;
+        }
       setTimeout(wsConnect, 2000);
     };
 
-    ws.onerror = function () { ws.close(); };
+      ws.onerror = function (e) {
+          console.error("WebSocket error:", e);
+          ws.close();
+      };
+  }
+
+    /* ── Polling fallback (Safari / WS failure) ────────────────────── */
+    var pollTimer = null;
+
+    function startPollingFallback() {
+        if (pollTimer) return;
+        console.log("WS unavailable, falling back to polling /api/snapshot");
+        wsStatus.textContent = "POLLING";
+        wsStatus.style.color = "#ffaa00";
+        feedOverlay.style.display = "none";
+
+        /* Hide canvas, show img fallback for maximum compatibility */
+        var fallbackImg = document.getElementById("live-fallback");
+        if (fallbackImg) {
+            canvas.style.display = "none";
+            fallbackImg.style.display = "block";
+            var polling = true;
+
+            function poll() {
+                if (!polling) return;
+                fallbackImg.onload = function () {
+                    frameCount++;
+                    frameCounter.textContent = frameCount;
+                    setTimeout(poll, 400);
+                };
+                fallbackImg.onerror = function () {
+                    setTimeout(poll, 2000);
+                };
+                fallbackImg.src = "/api/snapshot?t=" + Date.now();
+            }
+
+            poll();
+            pollTimer = true;
+        } else {
+            /* No fallback img, use hidden img + canvas */
+            pollTimer = setInterval(function () {
+                hiddenImg.src = "/api/snapshot?t=" + Date.now();
+                frameCount++;
+                frameCounter.textContent = frameCount;
+            }, 500);
+        }
   }
 
   /* ── Capture ───────────────────────────────────────────────────── */
@@ -346,7 +397,126 @@
     });
   }
 
-  /* ── Gallery ───────────────────────────────────────────────────── */
+    /* ── Upload to CRT ─────────────────────────────────────────────── */
+
+    var btnUpload, fileUpload, uploadStatus, uploadProg, uploadBar;
+
+    function initUpload() {
+        btnUpload = document.getElementById("btn-upload");
+        fileUpload = document.getElementById("file-upload");
+        uploadStatus = document.getElementById("upload-status");
+        uploadProg = document.getElementById("upload-prog");
+        uploadBar = document.getElementById("upload-bar");
+
+        btnUpload.addEventListener("click", function (e) {
+            e.preventDefault();
+            fileUpload.value = "";  /* Reset so same file re-triggers change */
+            fileUpload.click();
+        });
+
+        fileUpload.addEventListener("change", function () {
+            var file = fileUpload.files[0];
+            if (!file) return;
+
+            /* Validate: accept images (iOS HEIC may have empty type) */
+            var name = file.name.toLowerCase();
+            var isImage = file.type.startsWith("image/") ||
+                /\.(jpg|jpeg|png|gif|bmp|webp|heic|heif|tiff?)$/i.test(name);
+            if (!isImage) {
+                uploadStatus.textContent = "Select an image file";
+                return;
+            }
+            if (file.size > 12 * 1024 * 1024) {
+                uploadStatus.textContent = "Max 12MB";
+                return;
+            }
+
+            var sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+            btnUpload.disabled = true;
+            btnUpload.textContent = "Sending...";
+            uploadProg.style.display = "block";
+            uploadBar.style.width = "5%";
+            uploadStatus.textContent = name + " (" + sizeMB + " MB)";
+
+            var formData = new FormData();
+            formData.append("image", file);
+
+            /* Use XMLHttpRequest for upload progress tracking on mobile */
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/api/upload", true);
+            xhr.timeout = 30000;  /* 30s — serial transfer takes ~6s */
+
+            xhr.upload.onprogress = function (e) {
+                if (e.lengthComputable) {
+                    /* Upload phase: 0-50% of progress bar */
+                    var pct = Math.round((e.loaded / e.total) * 50);
+                    uploadBar.style.width = pct + "%";
+                    uploadStatus.textContent = "Uploading... " + pct + "%";
+                }
+            };
+
+            xhr.onload = function () {
+                var d;
+                try {
+                    d = JSON.parse(xhr.responseText);
+                } catch (e) {
+                    d = {error: "Bad response"};
+                }
+
+                if (xhr.status === 200 && d.ok) {
+                    uploadBar.style.width = "100%";
+                    uploadStatus.textContent = "On the CRT!";
+                    btnUpload.textContent = "Done!";
+                } else if (xhr.status === 401) {
+                    uploadStatus.textContent = "Login required";
+                    btnUpload.textContent = "Auth error";
+                } else {
+                    uploadBar.style.width = "0%";
+                    uploadStatus.textContent = d.error || ("HTTP " + xhr.status);
+                    btnUpload.textContent = "Failed";
+                }
+                setTimeout(resetUploadUI, 4000);
+            };
+
+            xhr.onerror = function () {
+                uploadBar.style.width = "0%";
+                uploadStatus.textContent = "Network error";
+                btnUpload.textContent = "Failed";
+                setTimeout(resetUploadUI, 4000);
+            };
+
+            xhr.ontimeout = function () {
+                uploadBar.style.width = "0%";
+                uploadStatus.textContent = "Timeout (try again)";
+                btnUpload.textContent = "Timeout";
+                setTimeout(resetUploadUI, 4000);
+            };
+
+            /* After upload completes, animate 50→95% while server processes + serial */
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 3) {  /* LOADING — response started */
+                    uploadBar.style.width = "50%";
+                    uploadStatus.textContent = "Processing + sending to CRT...";
+                    var t = setInterval(function () {
+                        var w = parseInt(uploadBar.style.width) || 50;
+                        if (w < 95) uploadBar.style.width = (w + 2) + "%";
+                        else clearInterval(t);
+                    }, 300);
+                }
+            };
+
+            xhr.send(formData);
+        });
+
+        function resetUploadUI() {
+            btnUpload.innerHTML = "&#128228; Send Image to CRT";
+            btnUpload.disabled = false;
+            uploadProg.style.display = "none";
+            uploadStatus.textContent = "";
+        }
+    }
+
+    /* ── Gallery ───────────────────────────────────────────────────── */
 
   function loadGallery() {
     fetch("/api/gallery").then(function (r) { return r.json(); })
@@ -450,7 +620,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     canvas        = document.getElementById("live-canvas");
-    ctx           = canvas.getContext("2d");
+      ctx = canvas.getContext("2d", {willReadFrequently: true});
     feedOverlay   = document.getElementById("feed-overlay");
     statsOverlay  = document.getElementById("stats-overlay");
     statLuma      = document.getElementById("stat-luma");
@@ -489,10 +659,24 @@
     initCapture();
     initRecord();
     initAnalyze();
+      initUpload();
     initLightbox();
     wsConnect();
 
     fpsTick = performance.now();
+
+      /* Livereload: poll /api/mtime every 2s, reload on change */
+      var lastMtime = 0;
+      setInterval(function () {
+          fetch("/api/mtime").then(function (r) {
+              return r.json();
+          })
+              .then(function (d) {
+                  if (lastMtime && d.mtime !== lastMtime) location.reload();
+                  lastMtime = d.mtime;
+              }).catch(function () {
+          });
+      }, 2000);
   });
 
 })();

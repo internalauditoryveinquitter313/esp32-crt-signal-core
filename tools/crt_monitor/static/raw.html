@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000">
+<title>CRT RAW</title>
+<style>
+*{margin:0;padding:0}
+html,body{background:#000;height:100%;overflow:hidden;cursor:none}
+img{width:100%;height:100%;object-fit:contain;display:block}
+/* Tap anywhere to toggle info */
+#info{position:fixed;bottom:0;left:0;right:0;padding:8px 12px;font:10px "Fira Code",monospace;color:#00ff41;background:rgba(0,0,0,.85);opacity:0;transition:opacity .3s;z-index:1;display:flex;justify-content:space-between}
+#info.on{opacity:1}
+</style>
+</head>
+<body>
+<img id="f" alt="">
+<div id="info"><span id="st">--</span><span id="fps">--</span></div>
+<script>
+(function(){
+  var f=document.getElementById('f'),info=document.getElementById('info');
+  var st=document.getElementById('st'),fpsEl=document.getElementById('fps');
+  var frames=0,t0=Date.now(),show=false;
+
+  /* MJPEG first, fallback to polling */
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+
+  function poll(){
+    fetch('/api/snapshot?t='+Date.now(),{cache:'no-store'})
+      .then(function(r){if(!r.ok)throw r;return r.blob()})
+      .then(function(b){
+        var u=URL.createObjectURL(b);
+        f.onload=function(){URL.revokeObjectURL(u);frames++;updateFps();setTimeout(poll,100)};
+        f.onerror=function(){URL.revokeObjectURL(u);setTimeout(poll,1000)};
+        f.src=u;
+      })
+      .catch(function(){st.textContent='OFFLINE';setTimeout(poll,2000)});
+  }
+
+  function updateFps(){
+    var now=Date.now(),dt=(now-t0)/1000;
+    if(dt>=2){fpsEl.textContent=(frames/dt).toFixed(1)+' fps';frames=0;t0=now}
+  }
+
+  if(isIOS){
+    st.textContent='POLL';poll();
+  }else{
+    /* Try MJPEG stream */
+    f.src='/stream';
+    var ok=false;
+    f.onload=function(){if(!ok){ok=true;st.textContent='STREAM';frames++;updateFps()}else{frames++;updateFps()}};
+    f.onerror=function(){if(!ok){st.textContent='POLL';poll()}};
+    setTimeout(function(){if(!ok){st.textContent='POLL';poll()}},3000);
+  }
+
+  /* Tap/click toggles info bar */
+  document.body.addEventListener('click',function(){
+    show=!show;info.classList.toggle('on',show);
+    document.body.style.cursor=show?'default':'none';
+  });
+
+  /* Fullscreen on double-tap/double-click */
+  document.body.addEventListener('dblclick',function(){
+    if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(function(){})}
+    else{document.exitFullscreen()}
+  });
+})();
+</script>
+</body>
+</html>
