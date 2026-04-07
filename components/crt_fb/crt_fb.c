@@ -96,6 +96,7 @@ uint8_t *crt_fb_row(const crt_fb_surface_t *surface, uint16_t y)
 
 void crt_fb_put(crt_fb_surface_t *surface, uint16_t x, uint16_t y, uint8_t value)
 {
+    if (surface == NULL || surface->buffer == NULL) return;
     if (x < surface->width && y < surface->height) {
         surface->buffer[(size_t)y * surface->width + x] = value;
     }
@@ -103,6 +104,7 @@ void crt_fb_put(crt_fb_surface_t *surface, uint16_t x, uint16_t y, uint8_t value
 
 uint8_t crt_fb_get(const crt_fb_surface_t *surface, uint16_t x, uint16_t y)
 {
+    if (surface == NULL || surface->buffer == NULL) return 0;
     if (x < surface->width && y < surface->height) {
         return surface->buffer[(size_t)y * surface->width + x];
     }
@@ -157,13 +159,24 @@ void crt_fb_scanline_hook(const crt_scanline_t *scanline,
     const uint8_t *row = &surface->buffer[(size_t)scanline->logical_line * surface->width];
     const uint16_t *pal = surface->palette;
 
-    /* Fixed-point 16.16 stepping — avoids division in inner loop.
-     * On Xtensa LX6: shift+add+load ≈ 5 cycles/pixel vs 35+ for division. */
+    /* Fixed-point 16.16 stepping with I2S word-swap baked in.
+     * Writes pairs of pixels in swapped order (index ^ 1) to avoid
+     * the separate word-swap pass. ~3 cycles/pixel on Xtensa LX6. */
     uint32_t step = ((uint32_t)surface->width << 16) / active_width;
     uint32_t acc = 0;
+    uint16_t i = 0;
+    const uint16_t even_width = active_width & ~1U;
 
-    for (uint16_t i = 0; i < active_width; ++i) {
-        active_buf[i] = pal[row[acc >> 16]];
+    for (; i < even_width; i += 2) {
+        uint16_t p0 = pal[row[acc >> 16]];
         acc += step;
+        uint16_t p1 = pal[row[acc >> 16]];
+        acc += step;
+        /* I2S expects swapped 16-bit words within each 32-bit DMA word */
+        active_buf[i] = p1;
+        active_buf[i + 1] = p0;
+    }
+    if (i < active_width) {
+        active_buf[i] = pal[row[acc >> 16]];
     }
 }
