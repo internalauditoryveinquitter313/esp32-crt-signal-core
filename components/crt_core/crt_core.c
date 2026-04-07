@@ -23,15 +23,18 @@
 #define CRT_CORE_MAX_BURST_WIDTH    64
 #define CRT_CORE_MAX_LINE_SAMPLES   1136
 
-static bool s_initialized;
-static bool s_running;
+static volatile bool s_initialized;
+static volatile bool s_running;
 static crt_core_config_t s_config;
 static crt_timing_profile_t s_timing;
 static TaskHandle_t s_prep_task;
-static uint32_t s_next_line_index;
+static volatile uint32_t s_next_line_index;
 static crt_demo_pattern_runtime_t s_demo_pattern;
 
 /* ── Hook layer ──────────────────────────────────────────────────── */
+/* Hook pointers are written from app task (Core 0) and read from prep task (Core 1).
+ * Use s_hook_lock critical section for atomic read/write of ptr+data pairs. */
+static portMUX_TYPE s_hook_lock = portMUX_INITIALIZER_UNLOCKED;
 static crt_frame_hook_fn     s_frame_hook;
 static void                 *s_frame_hook_data;
 static crt_scanline_hook_fn  s_scanline_hook;
@@ -59,6 +62,13 @@ static bool s_fast_mono_mode;
 static uint16_t s_fast_active_line[CRT_CORE_MAX_LINE_SAMPLES];
 static uint16_t s_fast_blank_line[CRT_CORE_MAX_LINE_SAMPLES];
 static uint16_t s_fast_vsync_line[CRT_CORE_MAX_LINE_SAMPLES];
+
+/* Pre-rendered line templates for hook path: blanking+sync+burst already baked in,
+ * active region left as blank_level for the hook to overwrite. */
+static uint16_t s_hook_active_template[CRT_CORE_MAX_LINE_SAMPLES];
+static uint16_t s_hook_blank_template[CRT_CORE_MAX_LINE_SAMPLES];
+static uint16_t s_hook_vsync_template[CRT_CORE_MAX_LINE_SAMPLES];
+static bool s_hook_templates_ready;
 
 static void crt_core_blanking_stage(const crt_line_context_t *ctx, crt_line_buffer_t *line, void *user_ctx)
 {
@@ -169,9 +179,11 @@ static crt_line_context_t crt_core_build_line_context(uint32_t line_index)
         case CRT_VIDEO_STANDARD_NTSC:
             active_line_index = (uint16_t)(line_index % s_timing.total_lines);
             break;
-        case CRT_VIDEO_STANDARD_PAL:
-            active_line_index = (uint16_t)((line_index % s_timing.total_lines) - 32U);
+        case CRT_VIDEO_STANDARD_PAL: {
+            uint16_t pal_line = (uint16_t)(line_index % s_timing.total_lines);
+            active_line_index = (pal_line >= 32U) ? (uint16_t)(pal_line - 32U) : 0U;
             break;
+        }
         default:
             active_line_index = 0;
             break;
@@ -277,14 +289,33 @@ static esp_err_t crt_core_fill_slot(size_t slot_index)
         if (s_next_line_index > 0) {
             s_frame_number++;
         }
-        if (s_frame_hook != NULL) {
-            s_frame_hook(s_frame_number, s_frame_hook_data);
+        /* Snapshot hook pointer+data atomically */
+        crt_frame_hook_fn frame_hook;
+        void *frame_hook_data;
+        portENTER_CRITICAL(&s_hook_lock);
+        frame_hook = s_frame_hook;
+        frame_hook_data = s_frame_hook_data;
+        portEXIT_CRITICAL(&s_hook_lock);
+        if (frame_hook != NULL) {
+            frame_hook(s_frame_number, frame_hook_data);
         }
     }
 
     prep_start = esp_cpu_get_cycle_count();
 
-    if (s_fast_mono_mode && s_scanline_hook == NULL && s_mod_hook == NULL) {
+    /* Snapshot hook pointers atomically — short critical section */
+    crt_scanline_hook_fn scanline_hook;
+    void *scanline_hook_data;
+    crt_mod_hook_fn mod_hook;
+    void *mod_hook_data;
+    portENTER_CRITICAL(&s_hook_lock);
+    scanline_hook = s_scanline_hook;
+    scanline_hook_data = s_scanline_hook_data;
+    mod_hook = s_mod_hook;
+    mod_hook_data = s_mod_hook_data;
+    portEXIT_CRITICAL(&s_hook_lock);
+
+    if (s_fast_mono_mode && scanline_hook == NULL && mod_hook == NULL) {
         /* Fast template path — no hooks can interfere */
         crt_timing_line_type_t line_type =
             crt_timing_get_line_type(s_config.video_standard, phys_line);
@@ -296,37 +327,34 @@ static esp_err_t crt_core_fill_slot(size_t slot_index)
             src = s_fast_vsync_line;
         }
         memcpy(buffer, src, s_timing.samples_per_line * sizeof(uint16_t));
-    } else if (s_scanline_hook != NULL || s_mod_hook != NULL) {
-        /* Hook path — interleave stages with hook invocations */
+    } else if ((scanline_hook != NULL || mod_hook != NULL) && s_hook_templates_ready) {
+        /* Fast hook path — memcpy pre-rendered template + hook active region only */
         crt_line_context_t ctx = crt_core_build_line_context(s_next_line_index);
-        crt_line_buffer_t line = {
-            .samples = buffer,
-            .sample_count = s_timing.samples_per_line,
-        };
-        crt_scanline_t sc = crt_core_build_scanline(&ctx);
+        crt_timing_line_type_t line_type = ctx.line_type;
 
-        /* Stages 0..2: blanking, sync, burst */
-        for (size_t i = 0; i < CRT_CORE_STAGE_COUNT - 1; ++i) {
-            s_stages[i].fn(&ctx, &line, s_stages[i].user_ctx);
+        /* 1. Copy pre-rendered template (already has sync+burst+blank + I2S swap) */
+        const uint16_t *tmpl = s_hook_blank_template;
+        if (line_type == CRT_TIMING_LINE_TYPE_ACTIVE) {
+            tmpl = s_hook_active_template;
+        } else if (line_type == CRT_TIMING_LINE_TYPE_VSYNC) {
+            tmpl = s_hook_vsync_template;
+        }
+        memcpy(buffer, tmpl, s_timing.samples_per_line * sizeof(uint16_t));
+
+        /* 2. Scanline hook overwrites active region (with I2S swap baked in) */
+        if (scanline_hook != NULL && ctx.in_active) {
+            crt_scanline_t sc = crt_core_build_scanline(&ctx);
+            scanline_hook(&sc,
+                          &buffer[ctx.active_offset],
+                          ctx.active_width,
+                          scanline_hook_data);
         }
 
-        /* Active content: scanline hook takes priority */
-        if (s_scanline_hook != NULL && ctx.in_active && render_active_stage) {
-            s_scanline_hook(&sc,
-                           &buffer[ctx.active_offset],
-                           ctx.active_width,
-                           s_scanline_hook_data);
-        } else if (render_active_stage) {
-            s_stages[CRT_CORE_STAGE_COUNT - 1].fn(&ctx, &line,
-                s_stages[CRT_CORE_STAGE_COUNT - 1].user_ctx);
+        /* 3. Mod hook: full line post-processing */
+        if (mod_hook != NULL) {
+            crt_scanline_t sc = crt_core_build_scanline(&ctx);
+            mod_hook(&sc, buffer, s_timing.samples_per_line, mod_hook_data);
         }
-
-        /* Mod hook: full line post-processing (before I2S swap) */
-        if (s_mod_hook != NULL) {
-            s_mod_hook(&sc, buffer, s_timing.samples_per_line, s_mod_hook_data);
-        }
-
-        crt_core_apply_i2s_word_swap(buffer, s_timing.samples_per_line);
     } else {
         /* Standard path — no hooks, no fast mono */
         crt_core_fill_line(s_next_line_index, buffer, s_timing.samples_per_line, render_active_stage);
@@ -385,6 +413,19 @@ esp_err_t crt_core_init(const crt_core_config_t *config)
     crt_demo_pattern_runtime_init(&s_demo_pattern, s_config.demo_pattern_mode, s_timing.active_lines);
     ESP_RETURN_ON_ERROR(crt_core_init_builtin_stages(), "crt_core", "builtin stage init failed");
     crt_core_maybe_init_fast_mono_templates();
+
+    /* Pre-render hook templates: full line with blanking/sync/burst + I2S swap,
+     * but active region at blank level. Hook overwrites active region only. */
+    if (s_timing.samples_per_line <= CRT_CORE_MAX_LINE_SAMPLES) {
+        /* Active line template (line 0) */
+        crt_core_fill_line(0, s_hook_active_template, s_timing.samples_per_line, false);
+        /* Blank line template */
+        crt_core_fill_line(s_timing.active_lines, s_hook_blank_template, s_timing.samples_per_line, false);
+        /* Vsync line template */
+        crt_core_fill_line(s_timing.active_lines + 3U, s_hook_vsync_template, s_timing.samples_per_line, false);
+        s_hook_templates_ready = true;
+    }
+
     s_phase_step_q20 = (uint32_t)(s_timing.samples_per_line % 4U)
                        * (CRT_PHASE_Q20_FULL_CYCLE / 4U);
     s_initialized = true;
@@ -461,11 +502,17 @@ esp_err_t crt_core_deinit(void)
     ESP_RETURN_ON_ERROR(err, "crt_core", "hal shutdown failed");
 
     s_initialized = false;
+    s_hook_templates_ready = false;
     memset(&s_timing, 0, sizeof(s_timing));
     memset(&s_config, 0, sizeof(s_config));
+    portENTER_CRITICAL(&s_hook_lock);
     s_frame_hook = NULL;
+    s_frame_hook_data = NULL;
     s_scanline_hook = NULL;
+    s_scanline_hook_data = NULL;
     s_mod_hook = NULL;
+    s_mod_hook_data = NULL;
+    portEXIT_CRITICAL(&s_hook_lock);
     return ESP_OK;
 }
 
@@ -482,21 +529,27 @@ esp_err_t crt_core_get_diag_snapshot(crt_diag_snapshot_t *out_snapshot)
 
 esp_err_t crt_register_frame_hook(crt_frame_hook_fn hook, void *user_data)
 {
+    portENTER_CRITICAL(&s_hook_lock);
     s_frame_hook_data = user_data;
     s_frame_hook = hook;
+    portEXIT_CRITICAL(&s_hook_lock);
     return ESP_OK;
 }
 
 esp_err_t crt_register_scanline_hook(crt_scanline_hook_fn hook, void *user_data)
 {
+    portENTER_CRITICAL(&s_hook_lock);
     s_scanline_hook_data = user_data;
     s_scanline_hook = hook;
+    portEXIT_CRITICAL(&s_hook_lock);
     return ESP_OK;
 }
 
 esp_err_t crt_register_mod_hook(crt_mod_hook_fn hook, void *user_data)
 {
+    portENTER_CRITICAL(&s_hook_lock);
     s_mod_hook_data = user_data;
     s_mod_hook = hook;
+    portEXIT_CRITICAL(&s_hook_lock);
     return ESP_OK;
 }
