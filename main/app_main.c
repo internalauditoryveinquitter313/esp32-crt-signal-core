@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "sdkconfig.h"
+#include "esp_attr.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -12,12 +13,53 @@
 #include "esp_vfs_dev.h"
 
 #include "crt_core.h"
+#include "crt_compose.h"
 #include "crt_fb.h"
 #include "godzilla_img.h"
+#include "esp_adc/adc_oneshot.h"
+
+#define LIGHT_SENSOR_ADC_CHANNEL ADC_CHANNEL_6   /* GPIO34 */
+#define LIGHT_SENSOR_ATTEN       ADC_ATTEN_DB_12 /* 0-3.3V range */
 
 static const char *TAG = "app_main";
 static const bool k_enable_color = CONFIG_CRT_ENABLE_COLOR;
 static crt_fb_surface_t s_fb;
+static crt_compose_t s_compose;
+
+/* Procedural overlay: solid rectangle drawn directly in active-width space.
+ * Used as a second compositor layer to validate z-order + keyed transparency
+ * on real hardware. Coords are in DAC-sample units, matching active_width. */
+typedef struct {
+    uint16_t x0;
+    uint16_t y0;
+    uint16_t x1;
+    uint16_t y1;
+    uint8_t color_idx;
+} overlay_rect_t;
+
+static overlay_rect_t s_overlay_rect = {
+    .x0 = 560,
+    .y0 = 12,
+    .x1 = 720,
+    .y1 = 40,
+    .color_idx = 255,
+};
+
+IRAM_ATTR static bool overlay_rect_fetch(void *ctx, uint16_t logical_line,
+                                         uint8_t *idx_out, uint16_t width)
+{
+    const overlay_rect_t *r = (const overlay_rect_t *)ctx;
+    if (logical_line < r->y0 || logical_line >= r->y1) {
+        return false;
+    }
+    memset(idx_out, 0, width);
+    uint16_t xa = r->x0 < width ? r->x0 : width;
+    uint16_t xb = r->x1 < width ? r->x1 : width;
+    for (uint16_t x = xa; x < xb; ++x) {
+        idx_out[x] = r->color_idx;
+    }
+    return true;
+}
 
 #define APP_FB_WIDTH    256
 #define APP_BLANK_LEVEL ((uint16_t)(23U << 8))
@@ -176,7 +218,7 @@ static esp_err_t app_start_core(crt_video_standard_t video_standard)
         .video_standard = video_standard,
         .enable_color = k_enable_color,
         .demo_pattern_mode = k_enable_color ? CRT_DEMO_PATTERN_COLOR_BARS_RAMP : CRT_DEMO_PATTERN_LUMA_BARS,
-        .target_ready_depth = 8,
+        .target_ready_depth = 32,
         .min_ready_depth = 0,
         .prep_task_core = 1,
     };
@@ -200,9 +242,25 @@ static esp_err_t app_start_core(crt_video_standard_t video_standard)
             /* Load image into framebuffer */
             memcpy(s_fb.buffer, godzilla_pixels, s_fb.buffer_size);
 
-            crt_register_scanline_hook(crt_fb_scanline_hook, &s_fb);
-            ESP_LOGI(TAG, "framebuffer: %ux%u indexed8 (%u bytes), scanline hook active",
-                     s_fb.width, s_fb.height, (unsigned)s_fb.buffer_size);
+            /* Compositor: layer 0 = fb (fused base, bit-exact with
+             * crt_fb_scanline_hook when no other layer contributes).
+             * Layer 1 = overlay rect (keyed, transparent_idx=0). Compose uses
+             * lazy materialization — 212/240 lines delegate directly to
+             * crt_fb_scanline_hook with zero extra cost. */
+            crt_compose_init(&s_compose);
+            crt_compose_set_palette(&s_compose, s_fb.palette, s_fb.palette_size);
+            crt_compose_add_layer_fused(&s_compose, crt_fb_layer_fetch,
+                                        crt_fb_scanline_hook, &s_fb);
+            crt_compose_add_layer(&s_compose, overlay_rect_fetch,
+                                  &s_overlay_rect, 0);
+
+            crt_register_scanline_hook(crt_compose_scanline_hook, &s_compose);
+            ESP_LOGI(TAG, "compose: fb %ux%u BG + overlay [%u,%u]-[%u,%u] "
+                     "(lazy materialization, %u/240 overlay lines)",
+                     s_fb.width, s_fb.height,
+                     s_overlay_rect.x0, s_overlay_rect.y0,
+                     s_overlay_rect.x1, s_overlay_rect.y1,
+                     (unsigned)(s_overlay_rect.y1 - s_overlay_rect.y0));
         } else {
             ESP_LOGW(TAG, "framebuffer alloc failed, falling back to demo pattern");
         }
@@ -236,35 +294,15 @@ void app_main(void)
         return;
     }
 
-    /* Configure UART0 for non-blocking reads (upload protocol) */
-    uart_driver_install(UPLOAD_UART_NUM, UPLOAD_RX_BUF, 0, 0, NULL, 0);
-    esp_vfs_dev_uart_use_driver(UPLOAD_UART_NUM);
-    s_uart_fd = open("/dev/uart/0", O_RDWR | O_NONBLOCK);
-    if (s_uart_fd >= 0) {
-        ESP_LOGI(TAG, "UART upload listener ready (fd=%d)", s_uart_fd);
-    } else {
-        /* Fallback: use stdin fd with fcntl non-block */
-        s_uart_fd = fileno(stdin);
-        fcntl(s_uart_fd, F_SETFL, fcntl(s_uart_fd, F_GETFL) | O_NONBLOCK);
-        ESP_LOGI(TAG, "UART upload listener on stdin (fd=%d)", s_uart_fd);
-    }
-
-    /* Main loop: diagnostics + serial upload check */
-    uint32_t diag_tick = 0;
+    /* Quiet main loop for timing stability test: no ADC read, no UART upload,
+     * only a slow diag snapshot every 5s. Minimises core-0 activity so the
+     * prep_task on core 1 does not contend with UART TX IRQs or ADC mutexes. */
     while (true) {
-        /* Check for incoming image upload (non-blocking) */
-        uart_upload_check(&s_fb);
-
-        vTaskDelay(pdMS_TO_TICKS(50)); /* 20Hz poll */
-
-        /* Diagnostic: log DMA underruns every 5s (100 ticks * 50ms) */
-        if (++diag_tick >= 100) {
-            diag_tick = 0;
-            crt_diag_snapshot_t diag;
-            crt_core_get_diag_snapshot(&diag);
-            ESP_LOGI(TAG, "diag: underruns=%"PRIu32" queue_min=%"PRIu32" prep_max=%"PRIu32" cycles",
-                     diag.dma_underrun_count, diag.ready_queue_min_depth, diag.prep_cycles_max);
-        }
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        crt_diag_snapshot_t diag;
+        crt_core_get_diag_snapshot(&diag);
+        ESP_LOGI(TAG, "diag: underruns=%"PRIu32" queue_min=%"PRIu32" prep_max=%"PRIu32" cycles",
+                 diag.dma_underrun_count, diag.ready_queue_min_depth, diag.prep_cycles_max);
     }
 
 #if CONFIG_CRT_TEST_STANDARD_TOGGLE
@@ -287,6 +325,7 @@ void app_main(void)
 
         /* Free framebuffer before deinit to avoid leak on re-init */
         crt_register_scanline_hook(NULL, NULL);
+        crt_compose_clear_layers(&s_compose);
         crt_fb_surface_deinit(&s_fb);
 
         err = crt_core_deinit();
