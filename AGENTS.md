@@ -77,6 +77,11 @@ gcc -I components/crt_fb/include -I components/crt_core/include \
     tests/crt_fb_test.c components/crt_fb/crt_fb.c \
     -o /tmp/crt_fb_test && /tmp/crt_fb_test
 
+gcc -I components/crt_compose/include -I components/crt_core/include \
+    -I components/crt_timing/include -I tests/stubs \
+    tests/crt_compose_test.c components/crt_compose/crt_compose.c \
+    -o /tmp/crt_compose_test && /tmp/crt_compose_test
+
 # Tooling
 (cd tools/crt_monitor && make)
 python tools/img2fb.py <input_image> <output.h> <variable_name>
@@ -89,6 +94,7 @@ python tools/img2fb.py <input_image> <output.h> <variable_name>
 - Changes under `components/crt_core/crt_line_policy.c`: run `line_policy_test`
 - Changes under `components/crt_core/include/crt_scanline.h` or hook ABI: run `crt_scanline_abi_test` and `crt_scanline_header_test`
 - Changes under `components/crt_fb/`: run `crt_fb_test`
+- Changes under `components/crt_compose/`: run `crt_compose_test`
 - Changes under `main/`, `components/crt_hal/`, `components/crt_core/crt_core.c`, or Kconfig/build wiring: run `idf.py build`
 - Changes under `tools/crt_monitor/`: run `make` in `tools/crt_monitor`
 - Documentation-only changes: verify for drift against current code paths and commands; update `README.md` if agent docs changed operational behavior
@@ -101,7 +107,8 @@ python tools/img2fb.py <input_image> <output.h> <variable_name>
 - `components/crt_timing/`: NTSC/PAL timing profiles and line classification
 - `components/crt_demo/`: demo pattern synthesis
 - `components/crt_diag/`: telemetry counters and snapshots
-- `components/crt_fb/`: indexed-8 framebuffer surface, palette LUT, scanline hook
+- `components/crt_fb/`: indexed-8 framebuffer surface, palette LUT, scanline hook, compose layer adapter
+- `components/crt_compose/`: per-scanline indexed-8 compositor, layer z-order + keyed transparency, palette LUT + I2S word-swap output
 - `tests/`: host-compiled assertion-based tests plus ESP-IDF stubs
 - `tools/crt_monitor/`: webcam-backed monitoring dashboard
 - `tools/img2fb.py`: image-to-framebuffer conversion helper
