@@ -15,11 +15,10 @@ Usage:
 """
 
 import argparse
-import sys
-from pathlib import Path
-
 import cv2
 import numpy as np
+import sys
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # NTSC 75% Color Bar Reference (SMPTE EG-1)

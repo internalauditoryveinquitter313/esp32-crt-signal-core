@@ -2,8 +2,8 @@
 """Convert image to C array for crt_fb framebuffer (INDEXED8 grayscale)."""
 
 import sys
-from pathlib import Path
 from PIL import Image, ImageEnhance, ImageOps
+from pathlib import Path
 
 FB_WIDTH = 256
 FB_HEIGHT = 240  # NTSC active lines (must match crt_timing profile)
