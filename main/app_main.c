@@ -62,13 +62,15 @@ static uint8_t s_checker_layer_idx = CRT_COMPOSE_LAYER_INVALID;
 DRAM_ATTR static uint8_t s_sprite_atlas_data[64 * 16];
 static crt_sprite_atlas_t s_sprite_atlas;
 static crt_sprite_layer_t s_sprite_layer;
-#define DEMO_SPRITE_COUNT 3
-static uint8_t s_sprite_ids[DEMO_SPRITE_COUNT];
+enum {
+    APP_DEMO_SPRITE_COUNT = 4,
+};
+static uint8_t s_sprite_ids[APP_DEMO_SPRITE_COUNT];
 
 static void demo_sprite_atlas_fill(void)
 {
-    static const uint8_t k_colors[DEMO_SPRITE_COUNT] = {64U, 128U, 192U, 240U};
-    for (uint8_t s = 0; s < DEMO_SPRITE_COUNT; ++s) {
+    static const uint8_t k_colors[APP_DEMO_SPRITE_COUNT] = {64U, 128U, 192U, 240U};
+    for (uint8_t s = 0; s < APP_DEMO_SPRITE_COUNT; ++s) {
         for (uint8_t y = 0; y < 16U; ++y) {
             uint8_t *row = &s_sprite_atlas_data[(size_t)y * 64U + (size_t)s * 16U];
             for (uint8_t x = 0; x < 16U; ++x) {
@@ -90,41 +92,6 @@ static void demo_sprite_atlas_fill(void)
 #define TILE_VISIBLE_H 30u
 static uint8_t s_tile_nametable[TILE_PITCH_W * TILE_PITCH_H];
 
-/* Procedural overlay: solid rectangle drawn directly in active-width space.
- * Used as a second compositor layer to validate z-order + keyed transparency
- * on real hardware. Coords are in DAC-sample units, matching active_width. */
-typedef struct {
-    uint16_t x0;
-    uint16_t y0;
-    uint16_t x1;
-    uint16_t y1;
-    uint8_t color_idx;
-} overlay_rect_t;
-
-static overlay_rect_t s_overlay_rect = {
-    .x0 = 560,
-    .y0 = 12,
-    .x1 = 720,
-    .y1 = 40,
-    .color_idx = 255,
-};
-
-IRAM_ATTR static bool overlay_rect_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out,
-                                         uint16_t width)
-{
-    const overlay_rect_t *r = (const overlay_rect_t *)ctx;
-    if (logical_line < r->y0 || logical_line >= r->y1) {
-        return false;
-    }
-    memset(idx_out, 0, width);
-    uint16_t xa = r->x0 < width ? r->x0 : width;
-    uint16_t xb = r->x1 < width ? r->x1 : width;
-    for (uint16_t x = xa; x < xb; ++x) {
-        idx_out[x] = r->color_idx;
-    }
-    return true;
-}
-
 #define APP_FB_WIDTH    256
 #define APP_FB_HEIGHT   240
 #define APP_BLANK_LEVEL ((uint16_t)(23U << 8))
@@ -143,9 +110,9 @@ IRAM_ATTR static void demo_frame_hook(uint32_t frame, void *user_data)
 
     /* Sprite world is logical 256x240 (before x_scale=3). Bounce inside
      * [0 .. 256-16] horizontally and [0 .. 240-16] vertically per sprite. */
-    static int16_t s_dx[DEMO_SPRITE_COUNT] = {1, -1, 2, -2};
-    static int16_t s_dy[DEMO_SPRITE_COUNT] = {1, 2, -1, -2};
-    for (uint8_t i = 0; i < DEMO_SPRITE_COUNT; ++i) {
+    static int16_t s_dx[APP_DEMO_SPRITE_COUNT] = {1, -1, 2, -2};
+    static int16_t s_dy[APP_DEMO_SPRITE_COUNT] = {1, 2, -1, -2};
+    for (uint8_t i = 0; i < APP_DEMO_SPRITE_COUNT; ++i) {
         if (s_sprite_ids[i] == CRT_SPRITE_INVALID_ID)
             continue;
         crt_sprite_t spr;
@@ -377,7 +344,7 @@ static esp_err_t app_start_core(crt_video_standard_t video_standard)
         crt_sprite_layer_set_max_sprites_per_line(&s_sprite_layer, CRT_SPRITE_DEFAULT_PERLINE);
         crt_sprite_layer_set_x_scale(&s_sprite_layer, 3U);
 
-        for (uint8_t i = 0; i < DEMO_SPRITE_COUNT; ++i) {
+        for (uint8_t i = 0; i < APP_DEMO_SPRITE_COUNT; ++i) {
             const int16_t spawn_x = (int16_t)(40 + i * 56);
             const int16_t spawn_y = (int16_t)(48 + i * 36); /* 48,84,120,156 — non-overlapping */
             esp_err_t spr_err = crt_sprite_add(&s_sprite_layer,
@@ -401,7 +368,7 @@ static esp_err_t app_start_core(crt_video_standard_t video_standard)
         crt_register_scanline_hook(crt_compose_scanline_hook, &s_compose);
         crt_register_frame_hook(demo_frame_hook, NULL);
         ESP_LOGI(TAG, "compose: tile %ux%u (h-scroll) + sprite layer (%u sprites, max/line=%u)",
-                 TILE_VISIBLE_W, TILE_VISIBLE_H, (unsigned)DEMO_SPRITE_COUNT,
+                 TILE_VISIBLE_W, TILE_VISIBLE_H, (unsigned)APP_DEMO_SPRITE_COUNT,
                  (unsigned)CRT_SPRITE_DEFAULT_PERLINE);
     }
 
