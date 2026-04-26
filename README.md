@@ -63,6 +63,13 @@ bash -c '. ~/esp/esp-idf/export.sh && idf.py -p /dev/ttyACM0 flash monitor'
 ## 🏗️ Architecture
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {
+  'fontFamily': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  'lineColor': '#64748b',
+  'primaryTextColor': '#111827',
+  'clusterBkg': '#f8fafc',
+  'clusterBorder': '#94a3b8'
+}}}%%
 flowchart LR
     subgraph Core1["🔧 Prep Task (Core 1)"]
         direction TB
@@ -87,6 +94,16 @@ flowchart LR
     RING --> I2S --> DAC --> GPIO
 
     ISR["EOF ISR<br/>Recycle Slots"] -.-> RING
+
+    classDef stage fill:#dff7ea,stroke:#0b7a3b,color:#102015,stroke-width:2px;
+    classDef dma fill:#e7edff,stroke:#4f46e5,color:#151a33,stroke-width:2px;
+    classDef hardware fill:#ffe5e8,stroke:#be123c,color:#3b1015,stroke-width:2px;
+    classDef interrupt fill:#fff3cc,stroke:#b45309,color:#332400,stroke-width:2px;
+
+    class BLANK,SYNC,BURST,ACTIVE stage;
+    class RING dma;
+    class I2S,DAC,GPIO hardware;
+    class ISR interrupt;
 ```
 
 ---
@@ -113,6 +130,11 @@ flowchart LR
 Each scanline passes through deterministic stages with a strict contract:
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {
+  'fontFamily': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  'lineColor': '#64748b',
+  'primaryTextColor': '#111827'
+}}}%%
 flowchart LR
     SLOT_IN["Recycled DMA Slot"] --> BLANK_STAGE["1. Blanking<br/>Front / Back Porch"]
     BLANK_STAGE --> SYNC_STAGE["2. Sync Pulse<br/>H-Sync / V-Sync"]
@@ -126,6 +148,16 @@ flowchart LR
     RULES -.-> BURST_STAGE
     RULES -.-> ACTIVE_STAGE
     SHED["If timing slips:<br/>shed optional stages, preserve sync"] -.-> ACTIVE_STAGE
+
+    classDef queue fill:#e7edff,stroke:#4f46e5,color:#151a33,stroke-width:2px;
+    classDef stage fill:#dff7ea,stroke:#0b7a3b,color:#102015,stroke-width:2px;
+    classDef output fill:#ffe5e8,stroke:#be123c,color:#3b1015,stroke-width:2px;
+    classDef rule fill:#fff3cc,stroke:#b45309,color:#332400,stroke-width:2px;
+
+    class SLOT_IN,SLOT_OUT queue;
+    class BLANK_STAGE,SYNC_STAGE,BURST_STAGE,ACTIVE_STAGE stage;
+    class OUTPUT output;
+    class RULES,SHED rule;
 ```
 
 **Stage rules:**
