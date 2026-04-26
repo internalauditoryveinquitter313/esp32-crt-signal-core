@@ -30,6 +30,7 @@ typedef struct {
     uint16_t active_width;
     uint16_t sync_width;
     uint16_t vsync_width;
+    uint16_t vsync_short_width;
     uint16_t burst_offset;
     uint16_t burst_width;
 } crt_timing_profile_t;

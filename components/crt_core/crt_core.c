@@ -70,20 +70,24 @@ static uint16_t s_hook_blank_template[CRT_CORE_MAX_LINE_SAMPLES];
 static uint16_t s_hook_vsync_template[CRT_CORE_MAX_LINE_SAMPLES];
 static bool s_hook_templates_ready;
 
-static uint16_t crt_core_active_template_line(void) {
+static uint16_t crt_core_active_template_line(void)
+{
     return s_timing.active_start_line;
 }
 
-static uint16_t crt_core_blank_template_line(void) {
+static uint16_t crt_core_blank_template_line(void)
+{
     return crt_timing_get_first_blank_line_after_active(&s_timing);
 }
 
-static uint16_t crt_core_vsync_template_line(void) {
+static uint16_t crt_core_vsync_template_line(void)
+{
     return s_timing.vsync_start_line;
 }
 
 static void crt_core_blanking_stage(const crt_line_context_t *ctx, crt_line_buffer_t *line,
-                                    void *user_ctx) {
+                                    void *user_ctx)
+{
     (void)ctx;
     (void)user_ctx;
 
@@ -93,17 +97,16 @@ static void crt_core_blanking_stage(const crt_line_context_t *ctx, crt_line_buff
 }
 
 static void crt_core_sync_stage(const crt_line_context_t *ctx, crt_line_buffer_t *line,
-                                void *user_ctx) {
-    size_t sync_width =
-            crt_line_policy_sync_width((const crt_timing_profile_t *) user_ctx, ctx->line_type);
-
-    for (size_t i = 0; i < sync_width && i < line->sample_count; ++i) {
-        line->samples[i] = CRT_CORE_SYNC_LEVEL;
-    }
+                                void *user_ctx)
+{
+    crt_line_policy_apply_sync((const crt_timing_profile_t *)user_ctx, ctx->line_index,
+                               ctx->line_type, line->samples, line->sample_count,
+                               CRT_CORE_SYNC_LEVEL);
 }
 
 static void crt_core_burst_stage(const crt_line_context_t *ctx, crt_line_buffer_t *line,
-                                 void *user_ctx) {
+                                 void *user_ctx)
+{
     size_t burst_width;
     const crt_core_burst_state_t *burst_state = (const crt_core_burst_state_t *)user_ctx;
     const uint16_t *template = burst_state->ntsc;
@@ -120,16 +123,16 @@ static void crt_core_burst_stage(const crt_line_context_t *ctx, crt_line_buffer_
 
     if (ctx->video_standard == CRT_VIDEO_STANDARD_PAL) {
         /* Match the legacy phase alternation: line 0 starts with the inverted template. */
-        template
-        =
-        ((ctx->line_index & 0x1U) == 0U) ? burst_state->pal_phase_b : burst_state->pal_phase_a;
+        template =
+            ((ctx->line_index & 0x1U) == 0U) ? burst_state->pal_phase_b : burst_state->pal_phase_a;
     }
 
     memcpy(&line->samples[ctx->burst_offset], template, burst_width * sizeof(line->samples[0]));
 }
 
 static void crt_core_active_window_base_stage(const crt_line_context_t *ctx,
-                                              crt_line_buffer_t *line, void *user_ctx) {
+                                              crt_line_buffer_t *line, void *user_ctx)
+{
     const crt_demo_pattern_runtime_t *demo_pattern = (const crt_demo_pattern_runtime_t *)user_ctx;
     const crt_demo_pattern_render_context_t demo_ctx = {
         .video_standard = ctx->video_standard,
@@ -188,15 +191,13 @@ static crt_line_context_t crt_core_build_line_context(uint32_t line_index)
     crt_timing_line_type_t line_type = crt_timing_get_profile_line_type(&s_timing, phys_line);
 
     if (line_type == CRT_TIMING_LINE_TYPE_ACTIVE) {
-        (void) crt_timing_get_active_line_index(&s_timing, phys_line, &active_line_index);
+        (void)crt_timing_get_active_line_index(&s_timing, phys_line, &active_line_index);
     }
 
-    return (crt_line_context_t)
-    {
+    return (crt_line_context_t){
         .video_standard = s_config.video_standard,
         .line_type = line_type,
-        .
-        line_index = phys_line,
+        .line_index = phys_line,
         .total_lines = s_timing.total_lines,
         .active_line_index = active_line_index,
         .active_line_count = s_timing.active_lines,
@@ -213,37 +214,31 @@ static crt_scanline_t crt_core_build_scanline(const crt_line_context_t *ctx)
 {
     crt_line_type_t type;
     switch (ctx->line_type) {
-        case CRT_TIMING_LINE_TYPE_ACTIVE:
-            type = CRT_LINE_ACTIVE;
-            break;
-        case CRT_TIMING_LINE_TYPE_VSYNC:
-            type = CRT_LINE_VSYNC;
-            break;
-        default:
-            type = CRT_LINE_BLANK;
-            break;
+    case CRT_TIMING_LINE_TYPE_ACTIVE:
+        type = CRT_LINE_ACTIVE;
+        break;
+    case CRT_TIMING_LINE_TYPE_VSYNC:
+        type = CRT_LINE_VSYNC;
+        break;
+    default:
+        type = CRT_LINE_BLANK;
+        break;
     }
 
-    return (crt_scanline_t)
-    {
-        .
-        physical_line = ctx->line_index,
-        .
-        logical_line = ctx->in_active ? ctx->active_line_index : CRT_SCANLINE_LOGICAL_LINE_NONE,
-        .
-        type = type,
-        .
-        field = 0,
-        .
-        frame_number = s_frame_number,
+    return (crt_scanline_t){
+        .physical_line = ctx->line_index,
+        .logical_line = ctx->in_active ? ctx->active_line_index : CRT_SCANLINE_LOGICAL_LINE_NONE,
+        .type = type,
+        .field = 0,
+        .frame_number = s_frame_number,
         .subcarrier_phase = s_subcarrier_phase,
-        .
-        timing = &s_timing,
+        .timing = &s_timing,
     };
 }
 
 static void crt_core_execute_stages(const crt_line_context_t *ctx, crt_line_buffer_t *line,
-                                    bool render_active_stage) {
+                                    bool render_active_stage)
+{
     for (size_t i = 0; i < CRT_CORE_STAGE_COUNT; ++i) {
         if (!render_active_stage && i == (CRT_CORE_STAGE_COUNT - 1U)) {
             continue;
@@ -262,7 +257,8 @@ static void crt_core_apply_i2s_word_swap(uint16_t *buffer, size_t sample_count)
 }
 
 static void crt_core_fill_line(uint32_t line_index, uint16_t *buffer, size_t sample_count,
-                               bool render_active_stage) {
+                               bool render_active_stage)
+{
     crt_line_context_t ctx = crt_core_build_line_context(line_index);
     crt_line_buffer_t line = {
         .samples = buffer,
@@ -292,7 +288,8 @@ static void crt_core_maybe_init_fast_mono_templates(void)
     s_fast_mono_mode = true;
 }
 
-static esp_err_t crt_core_fill_slot(size_t slot_index, size_t recycled_queue_depth) {
+static esp_err_t crt_core_fill_slot(size_t slot_index, size_t recycled_queue_depth)
+{
     uint16_t *buffer = NULL;
     esp_err_t err = crt_hal_get_line_buffer(slot_index, &buffer);
     esp_cpu_cycle_count_t prep_start;
@@ -395,7 +392,7 @@ static void crt_core_prep_task(void *arg)
         }
 
         size_t recycled_queue_depth = crt_hal_get_recycled_queue_depth();
-        crt_diag_update_ready_queue_depth((uint32_t) recycled_queue_depth);
+        crt_diag_update_ready_queue_depth((uint32_t)recycled_queue_depth);
         crt_diag_set_dma_underrun_count(crt_hal_get_dma_underrun_count());
         crt_core_fill_slot(slot_index, recycled_queue_depth);
     }
@@ -408,8 +405,8 @@ esp_err_t crt_core_init(const crt_core_config_t *config)
 
     ESP_RETURN_ON_FALSE(config != NULL, ESP_ERR_INVALID_ARG, "crt_core", "config is null");
     ESP_RETURN_ON_FALSE(config->prep_task_core >= 0 && config->prep_task_core < portNUM_PROCESSORS,
-                            ESP_ERR_INVALID_ARG, "crt_core",
-                            "prep task core must be a valid CPU index");
+                        ESP_ERR_INVALID_ARG, "crt_core",
+                        "prep task core must be a valid CPU index");
 
     err = crt_timing_get_profile(config->video_standard, &s_timing);
     ESP_RETURN_ON_ERROR(err, "crt_core", "timing profile lookup failed");

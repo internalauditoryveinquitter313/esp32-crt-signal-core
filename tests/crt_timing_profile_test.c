@@ -14,11 +14,12 @@ static void test_ntsc_profile_matches_legacy_4x_colorburst_timing(void)
     assert(profile.samples_per_line == 912);
     assert(profile.sync_width == 64);
     assert(profile.vsync_width == 392);
+    assert(profile.vsync_short_width == 0);
     assert(profile.burst_offset == 64);
     assert(profile.burst_width == 40);
     assert(profile.active_offset == 144);
-    assert((uint32_t) profile.active_offset + (uint32_t) profile.active_width <=
-           (uint32_t) profile.samples_per_line);
+    assert((uint32_t)profile.active_offset + (uint32_t)profile.active_width <=
+           (uint32_t)profile.samples_per_line);
 }
 
 static void test_pal_profile_matches_legacy_4x_colorburst_timing(void)
@@ -33,14 +34,16 @@ static void test_pal_profile_matches_legacy_4x_colorburst_timing(void)
     assert(profile.samples_per_line == 1136);
     assert(profile.sync_width == 80);
     assert(profile.vsync_width == 536);
+    assert(profile.vsync_short_width == 32);
     assert(profile.burst_offset == 96);
     assert(profile.burst_width == 44);
     assert(profile.active_offset == 184);
-    assert((uint32_t) profile.active_offset + (uint32_t) profile.active_width <=
-           (uint32_t) profile.samples_per_line);
+    assert((uint32_t)profile.active_offset + (uint32_t)profile.active_width <=
+           (uint32_t)profile.samples_per_line);
 }
 
-static void test_active_line_index_is_timing_owned(void) {
+static void test_active_line_index_is_timing_owned(void)
+{
     crt_timing_profile_t ntsc = {0};
     crt_timing_profile_t pal = {0};
     uint16_t active_line = 0xFFFFU;
@@ -69,7 +72,8 @@ static void test_active_line_index_is_timing_owned(void) {
     assert(crt_timing_get_profile_line_type(&pal, 32) == CRT_TIMING_LINE_TYPE_ACTIVE);
 }
 
-static void test_pal_vsync_window_is_profile_owned(void) {
+static void test_pal_vsync_window_is_profile_owned(void)
+{
     int vsync_lines = 0;
 
     for (uint16_t line = 0; line < 312; ++line) {
