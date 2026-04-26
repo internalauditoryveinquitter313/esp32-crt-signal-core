@@ -2,14 +2,6 @@
 
 <img src="./.github/assets/readme-hero.svg" alt="CRT Signal Core - Deterministic Composite Video Engine for ESP32" width="100%"/>
 
-<br/>
-
-<img src="./.github/assets/crt-mark.svg" alt="Retro CRT television icon" width="72"/>
-
-<h1>CRT Signal Core</h1>
-
-<p><strong>Deterministic Composite Video Engine for ESP32</strong></p>
-
 <p>
   <a href="https://docs.espressif.com/projects/esp-idf/"><img src="https://img.shields.io/badge/ESP--IDF-5.4%2B-ff4aa2?style=flat-square&labelColor=211826" alt="ESP-IDF 5.4+"/></a>
   <a href="https://en.wikipedia.org/wiki/C11_(C_standard_revision)"><img src="https://img.shields.io/badge/C11-embedded-27d7e8?style=flat-square&labelColor=211826" alt="C11 Embedded"/></a>
