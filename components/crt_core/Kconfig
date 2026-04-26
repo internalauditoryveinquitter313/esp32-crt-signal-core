@@ -37,6 +37,13 @@ config CRT_RENDER_MODE_RGB332_FB
         Uses the ESP_8_BIT-derived RGB332 composite color tables to render
         a 256x240 framebuffer directly, bypassing the tile compositor.
 
+config CRT_RENDER_MODE_STIMULUS
+    bool "Measurement stimulus compositor"
+    help
+        Uses crt_stimulus as an opaque compositor base layer to emit
+        deterministic ramps, markers, PRBS, impulse, and chirp patterns for
+        capture-card/CRT measurement loops.
+
 endchoice
 
 config CRT_ENABLE_UART_UPLOAD
