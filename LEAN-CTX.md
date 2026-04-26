@@ -58,19 +58,19 @@ MCP adds caching, modes, and analysis on top.
 
 ## Component Mode Strategy
 
-| Component | Path | Mode | Reason |
-|-----------|------|------|--------|
-| crt_core | `components/crt_core/` | `full` | Hot path, edited frequently |
-| crt_hal | `components/crt_hal/` | `map` | Hardware layer, rarely edited |
-| crt_timing | `components/crt_timing/` | `signatures` | Constants and lookup tables |
-| crt_demo | `components/crt_demo/` | `map` | Color palettes, patterns |
-| crt_diag | `components/crt_diag/` | `signatures` | Simple lock-free API |
-| crt_fb | `components/crt_fb/` | `full` | Framebuffer, actively developed |
-| app_main | `main/app_main.c` | `full` | Entry point, always relevant |
-| crt_monitor | `tools/crt_monitor/` | `map` | Web dashboard, separate tool |
-| godzilla_img.h | `main/godzilla_img.h` | `reference` | ~60KB pixel data, NEVER full |
-| test files | `tests/` | `signatures` | Just assert patterns |
-| stubs | `tests/stubs/` | `signatures` | ESP-IDF type mocks |
+| Component      | Path                     | Mode         | Reason                          |
+|----------------|--------------------------|--------------|---------------------------------|
+| crt_core       | `components/crt_core/`   | `full`       | Hot path, edited frequently     |
+| crt_hal        | `components/crt_hal/`    | `map`        | Hardware layer, rarely edited   |
+| crt_timing     | `components/crt_timing/` | `signatures` | Constants and lookup tables     |
+| crt_demo       | `components/crt_demo/`   | `map`        | Color palettes, patterns        |
+| crt_diag       | `components/crt_diag/`   | `signatures` | Simple lock-free API            |
+| crt_fb         | `components/crt_fb/`     | `full`       | Framebuffer, actively developed |
+| app_main       | `main/app_main.c`        | `full`       | Entry point, always relevant    |
+| crt_monitor    | `tools/crt_monitor/`     | `map`        | Web dashboard, separate tool    |
+| godzilla_img.h | `main/godzilla_img.h`    | `reference`  | ~60KB pixel data, NEVER full    |
+| test files     | `tests/`                 | `signatures` | Just assert patterns            |
+| stubs          | `tests/stubs/`           | `signatures` | ESP-IDF type mocks              |
 
 ## Project Structure
 

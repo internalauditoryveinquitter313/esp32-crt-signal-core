@@ -1,14 +1,22 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:08090d,50:34131f,100:153222&height=200&section=header&text=CRT%20Signal%20Core&fontSize=55&fontColor=b8ff6a&animation=twinkling&fontAlignY=35&desc=Deterministic%20Composite%20Video%20Engine%20for%20ESP32&descSize=16&descAlignY=55&descColor=e5e7eb" width="100%"/>
+<img src="./.github/assets/readme-hero.svg" alt="CRT Signal Core - Deterministic Composite Video Engine for ESP32" width="100%"/>
 
-<img src="./.github/assets/television.png" alt="Retro CRT television icon" width="72"/>
+<br/>
 
-[![ESP-IDF](https://img.shields.io/badge/ESP--IDF-5.4+-C11?style=for-the-badge&logo=espressif&logoColor=fff)](https://docs.espressif.com/projects/esp-idf/)
-[![C](https://img.shields.io/badge/C11-Embedded-555?style=for-the-badge&logo=c&logoColor=fff)](https://en.wikipedia.org/wiki/C11_(C_standard_revision))
-[![ESP32](https://img.shields.io/badge/ESP32--D0WD--V3-GPIO25-e7352c?style=for-the-badge&logo=espressif&logoColor=fff)](https://www.espressif.com/en/products/socs/esp32)
-[![Tests](https://img.shields.io/badge/tests-host_checked-00875A?style=for-the-badge)](./tests)
-[![License](https://img.shields.io/badge/license-MIT-2d1b69?style=for-the-badge)](./LICENSE)
+<img src="./.github/assets/crt-mark.svg" alt="Retro CRT television icon" width="72"/>
+
+<h1>CRT Signal Core</h1>
+
+<p><strong>Deterministic Composite Video Engine for ESP32</strong></p>
+
+<p>
+  <a href="https://docs.espressif.com/projects/esp-idf/"><img src="https://img.shields.io/badge/ESP--IDF-5.4%2B-ff4aa2?style=flat-square&labelColor=211826" alt="ESP-IDF 5.4+"/></a>
+  <a href="https://en.wikipedia.org/wiki/C11_(C_standard_revision)"><img src="https://img.shields.io/badge/C11-embedded-27d7e8?style=flat-square&labelColor=211826" alt="C11 Embedded"/></a>
+  <a href="https://www.espressif.com/en/products/socs/esp32"><img src="https://img.shields.io/badge/ESP32--D0WD--V3-GPIO25-ffd15a?style=flat-square&labelColor=211826" alt="ESP32-D0WD-V3 GPIO25"/></a>
+  <a href="./tests"><img src="https://img.shields.io/badge/tests-host%20checked-9d7cff?style=flat-square&labelColor=211826" alt="Tests host checked"/></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-27d7e8?style=flat-square&labelColor=211826" alt="License MIT"/></a>
+</p>
 
 **Scanlines are the heartbeat. Sync is the contract. The signal never lies.**
 
@@ -60,17 +68,6 @@ bash -c '. ~/esp/esp-idf/export.sh && idf.py -p /dev/ttyACM0 flash monitor'
 ## 🏗️ Architecture
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {
-  'background': '#0b0d12',
-  'primaryTextColor': '#f8fafc',
-  'primaryBorderColor': '#c7d2fe',
-  'lineColor': '#9be564',
-  'secondaryColor': '#160f14',
-  'tertiaryColor': '#10161f',
-  'clusterBkg': '#10161f',
-  'clusterBorder': '#7f1d1d',
-  'fontFamily': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
-}}}%%
 flowchart LR
     subgraph Core1["🔧 Prep Task (Core 1)"]
         direction TB
@@ -95,16 +92,6 @@ flowchart LR
     RING --> I2S --> DAC --> GPIO
 
     ISR["EOF ISR<br/>Recycle Slots"] -.-> RING
-
-    classDef stage fill:#16351f,stroke:#b8ff6a,color:#f8fafc,stroke-width:2px;
-    classDef dma fill:#1c2230,stroke:#a5b4fc,color:#f8fafc,stroke-width:2px;
-    classDef hw fill:#5b1720,stroke:#fb7185,color:#f8fafc,stroke-width:2px;
-    classDef note fill:#33252b,stroke:#d4d4d8,color:#f8fafc,stroke-width:2px;
-
-    class BLANK,SYNC,BURST,ACTIVE stage;
-    class RING dma;
-    class I2S,DAC,GPIO hw;
-    class ISR note;
 ```
 
 ---
@@ -121,6 +108,8 @@ flowchart LR
 | **`crt_demo`**        | Test pattern generator             | Color bars, ramps, grids         |
 | **`crt_diag`**        | Runtime telemetry                  | Late line detection, ISR stats   |
 | **`crt_fb`**          | Indexed-8 framebuffer adapter      | Hook-based active video source   |
+| **`crt_compose`**     | Indexed-8 scanline compositor      | Z-order + keyed transparency     |
+| **`crt_tile`**        | PPU-style tilemap backend          | 8x8 patterns + fast expansion    |
 
 ---
 
@@ -129,17 +118,6 @@ flowchart LR
 Each scanline passes through deterministic stages with a strict contract:
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {
-  'background': '#0b0d12',
-  'primaryTextColor': '#f8fafc',
-  'primaryBorderColor': '#c7d2fe',
-  'lineColor': '#9be564',
-  'secondaryColor': '#160f14',
-  'tertiaryColor': '#10161f',
-  'clusterBkg': '#10161f',
-  'clusterBorder': '#7f1d1d',
-  'fontFamily': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
-}}}%%
 flowchart LR
     SLOT_IN["Recycled DMA Slot"] --> BLANK_STAGE["1. Blanking<br/>Front / Back Porch"]
     BLANK_STAGE --> SYNC_STAGE["2. Sync Pulse<br/>H-Sync / V-Sync"]
@@ -153,16 +131,6 @@ flowchart LR
     RULES -.-> BURST_STAGE
     RULES -.-> ACTIVE_STAGE
     SHED["If timing slips:<br/>shed optional stages, preserve sync"] -.-> ACTIVE_STAGE
-
-    classDef queue fill:#1c2230,stroke:#a5b4fc,color:#f8fafc,stroke-width:2px;
-    classDef stage fill:#16351f,stroke:#b8ff6a,color:#f8fafc,stroke-width:2px;
-    classDef rule fill:#33252b,stroke:#d4d4d8,color:#f8fafc,stroke-width:2px;
-    classDef output fill:#5b1720,stroke:#fb7185,color:#f8fafc,stroke-width:2px;
-
-    class SLOT_IN,SLOT_OUT queue;
-    class BLANK_STAGE,SYNC_STAGE,BURST_STAGE,ACTIVE_STAGE stage;
-    class RULES,SHED rule;
-    class OUTPUT output;
 ```
 
 **Stage rules:**
@@ -193,11 +161,13 @@ flowchart LR
 ```
 esp32-crt-signal-core/
 ├── main/
-│   └── app_main.c                          # Entry point
+│   ├── app_main.c                          # Entry point and demo wiring
+│   └── tile_demo.h                         # Tile demo data
 ├── components/
-│   ├── crt_core/                           # Engine + pipeline stages
+│   ├── crt_core/                           # Engine lifecycle + pipeline stages
 │   │   ├── include/
 │   │   │   ├── crt_core.h                  # Public API
+│   │   │   ├── crt_scanline.h              # Hook metadata ABI
 │   │   │   ├── crt_stage.h                 # Stage contract
 │   │   │   ├── crt_waveform.h              # Burst/chroma synthesis
 │   │   │   └── crt_line_policy.h           # Line type classifier
@@ -208,12 +178,22 @@ esp32-crt-signal-core/
 │   ├── crt_timing/                         # NTSC/PAL timing profiles
 │   ├── crt_demo/                           # Test pattern generator
 │   ├── crt_diag/                           # Runtime telemetry
-│   └── crt_fb/                             # Indexed-8 framebuffer + scanline hook
+│   ├── crt_fb/                             # Indexed-8 framebuffer + scanline hook
+│   ├── crt_compose/                        # Layer compositor
+│   └── crt_tile/                           # Tilemap renderer
 ├── tests/                                  # Host-compiled C tests
 │   ├── burst_waveform_test.c
 │   ├── crt_timing_profile_test.c
 │   ├── crt_demo_pattern_test.c
+│   ├── crt_scanline_abi_test.c
+│   ├── crt_scanline_header_test.c
+│   ├── crt_fb_test.c
+│   ├── crt_compose_test.c
+│   ├── crt_tile_test.c
 │   └── line_policy_test.c
+├── tools/
+│   ├── img2fb.py                           # Image-to-framebuffer helper
+│   └── crt_monitor/                        # Webcam-backed monitor dashboard
 ├── docs/                                   # Reference docs
 ├── .clang-format                           # Code style (embedded C)
 ├── .clang-tidy                             # Static analysis config
@@ -243,53 +223,34 @@ esp32-crt-signal-core/
 git clone https://github.com/gabrielmaialva33/esp32-crt-signal-core.git
 cd esp32-crt-signal-core
 
-# Build
+# Build firmware
 bash -c '. ~/esp/esp-idf/export.sh && idf.py build'
 
 # Flash & monitor
 bash -c '. ~/esp/esp-idf/export.sh && idf.py -p /dev/ttyACM0 flash monitor'
 ```
 
+### Runtime Options
+
+Configure these with `idf.py menuconfig`:
+
+| Option                                | Purpose                                       |
+|:--------------------------------------|:----------------------------------------------|
+| `CRT_VIDEO_STANDARD`                  | Selects NTSC or PAL timing                    |
+| `CRT_ENABLE_COLOR`                    | Enables chroma burst and color demo output    |
+| `CRT_ENABLE_UART_UPLOAD`              | Enables experimental UART0 framebuffer upload |
+| `CRT_TEST_STANDARD_TOGGLE`            | Alternates NTSC/PAL at runtime for testing    |
+| `CRT_TEST_STANDARD_TOGGLE_INTERVAL_S` | Seconds between standard switches             |
+
 ### Running Tests (Host)
 
 ```bash
-# Burst waveform synthesis
-gcc -I components/crt_core/include -I components/crt_timing/include \
-    tests/burst_waveform_test.c components/crt_core/crt_waveform.c \
-    -lm -o /tmp/burst_test && /tmp/burst_test
+# Full host matrix
+make test
 
-# Line policy
-gcc -I components/crt_core/include -I components/crt_timing/include \
-    tests/line_policy_test.c components/crt_core/crt_line_policy.c \
-    -o /tmp/policy_test && /tmp/policy_test
-
-# Timing profiles
-gcc -I components/crt_timing/include \
-    tests/crt_timing_profile_test.c components/crt_timing/crt_timing.c \
-    -o /tmp/timing_test && /tmp/timing_test
-
-# Demo patterns
-gcc -I components/crt_core/include -I components/crt_timing/include \
-    -I components/crt_demo/include \
-    tests/crt_demo_pattern_test.c components/crt_demo/crt_demo_pattern.c \
-    components/crt_core/crt_waveform.c -lm \
-    -o /tmp/demo_test && /tmp/demo_test
-
-# Scanline ABI layout + constants
-gcc -I components/crt_core/include -I components/crt_timing/include \
-    -I tests/stubs tests/crt_scanline_abi_test.c \
-    -o /tmp/scanline_abi_test && /tmp/scanline_abi_test
-
-# Scanline header contract
-gcc -I components/crt_core/include -I components/crt_timing/include \
-    -I tests/stubs tests/crt_scanline_header_test.c \
-    -o /tmp/scanline_header_test && /tmp/scanline_header_test
-
-# Framebuffer surface + palette + scanline hook
-gcc -I components/crt_fb/include -I components/crt_core/include \
-    -I components/crt_timing/include -I tests/stubs \
-    tests/crt_fb_test.c components/crt_fb/crt_fb.c \
-    -o /tmp/crt_fb_test && /tmp/crt_fb_test
+# Focused groups for faster iteration
+make test-core
+make test-render
 ```
 
 ---
@@ -298,8 +259,8 @@ gcc -I components/crt_fb/include -I components/crt_core/include \
 
 | Metric                 |           Value |
 |:-----------------------|----------------:|
-| **Host test programs** |               7 |
-| **Components**         |               6 |
+| **Host test programs** |               9 |
+| **Components**         |               8 |
 | **DMA channels**       | I2S0 continuous |
 | **DAC resolution**     |           8-bit |
 | **Output pin**         |          GPIO25 |
@@ -314,10 +275,10 @@ gcc -I components/crt_fb/include -I components/crt_core/include \
 
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0a0a0a,50:1a1a2e,100:2d1b69&height=120&section=footer&fontSize=30&fontColor=00ff41&animation=twinkling" width="100%"/>
+<img src="./.github/assets/readme-footer.svg" alt="Built with phosphor persistence and scanline discipline." width="100%"/>
 
 *Built with phosphor persistence and scanline discipline.*
 
-<img src="https://img.shields.io/badge/made%20by-Maia-15c3d6?style=flat&logo=appveyor" alt="Maia" >
+<img src="https://img.shields.io/badge/made%20by-Maia-ff4aa2?style=flat-square&labelColor=211826" alt="Made by Maia"/>
 
 </div>

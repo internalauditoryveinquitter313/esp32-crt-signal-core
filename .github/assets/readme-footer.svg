@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="96" viewBox="0 0 1200 96" role="img" aria-labelledby="title">
+  <title id="title">Built with phosphor persistence and scanline discipline.</title>
+  <defs>
+    <style>
+      :root {
+        --bg: #fff8f0;
+        --ink: #201827;
+        --muted: #6f5674;
+        --cyan: #007f91;
+        --pink: #cf1b7f;
+        --amber: #c46f00;
+        --rule: #ead6e7;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #090613;
+          --ink: #fff4df;
+          --muted: #d7b7d7;
+          --cyan: #26d8e8;
+          --pink: #ff4aa2;
+          --amber: #ffd15a;
+          --rule: #352540;
+        }
+      }
+
+      .caption { font: 800 18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--ink); letter-spacing: 0; }
+      .note { font: 700 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--muted); letter-spacing: 0; }
+    </style>
+  </defs>
+  <rect width="1200" height="96" rx="16" fill="var(--bg)"/>
+  <path d="M48 48h112v-22h24v22h54l14-30 16 60 16-30h70" fill="none" stroke="var(--cyan)" stroke-width="4" stroke-linecap="square" stroke-linejoin="round"/>
+  <path d="M850 50h42v-14h28v14h42v-14h28v14h42v-14h28v14h42" fill="none" stroke="var(--pink)" stroke-width="4" stroke-linecap="square"/>
+  <text class="caption" x="600" y="44" text-anchor="middle">Built with phosphor persistence and scanline discipline.</text>
+  <text class="note" x="600" y="66" text-anchor="middle">SYNC LOCKED / DMA RING HOT / GPIO25 LIVE</text>
+  <path d="M420 76h360" stroke="var(--amber)" stroke-width="2"/>
+</svg>

@@ -46,6 +46,10 @@ bash -c '. ~/esp/esp-idf/export.sh && idf.py menuconfig'
 bash -c '. ~/esp/esp-idf/export.sh && idf.py set-target esp32'
 
 # Host tests
+make test
+make test-core
+make test-render
+
 gcc -I components/crt_core/include -I components/crt_timing/include \
     tests/burst_waveform_test.c components/crt_core/crt_waveform.c \
     -lm -o /tmp/burst_test && /tmp/burst_test
@@ -148,6 +152,7 @@ python tools/img2fb.py <input_image> <output.h> <variable_name>
 
 - `CRT_VIDEO_STANDARD`: selects NTSC or PAL timing
 - `CRT_ENABLE_COLOR`: enables chroma burst and color demo output
+- `CRT_ENABLE_UART_UPLOAD`: enables experimental UART0 raw framebuffer upload
 - `CRT_TEST_STANDARD_TOGGLE`: auto-toggle NTSC/PAL at runtime
 - `CRT_TEST_STANDARD_TOGGLE_INTERVAL_S`: toggle interval in seconds
 
