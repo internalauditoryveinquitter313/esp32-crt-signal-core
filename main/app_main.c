@@ -70,7 +70,7 @@ static uint8_t s_sprite_ids[APP_DEMO_SPRITE_COUNT];
 static void demo_sprite_atlas_fill(void)
 {
     static const uint8_t k_colors[APP_DEMO_SPRITE_COUNT] = {64U, 128U, 192U, 240U};
-    for (uint8_t s = 0; s < APP_DEMO_SPRITE_COUNT; ++s) {
+    for (size_t s = 0; s < APP_DEMO_SPRITE_COUNT; ++s) {
         for (uint8_t y = 0; y < 16U; ++y) {
             uint8_t *row = &s_sprite_atlas_data[(size_t)y * 64U + (size_t)s * 16U];
             for (uint8_t x = 0; x < 16U; ++x) {
@@ -112,18 +112,22 @@ IRAM_ATTR static void demo_frame_hook(uint32_t frame, void *user_data)
      * [0 .. 256-16] horizontally and [0 .. 240-16] vertically per sprite. */
     static int16_t s_dx[APP_DEMO_SPRITE_COUNT] = {1, -1, 2, -2};
     static int16_t s_dy[APP_DEMO_SPRITE_COUNT] = {1, 2, -1, -2};
-    for (uint8_t i = 0; i < APP_DEMO_SPRITE_COUNT; ++i) {
-        if (s_sprite_ids[i] == CRT_SPRITE_INVALID_ID)
+    for (size_t i = 0; i < APP_DEMO_SPRITE_COUNT; ++i) {
+        if (s_sprite_ids[i] == CRT_SPRITE_INVALID_ID) {
             continue;
+        }
         crt_sprite_t spr;
-        if (crt_sprite_get(&s_sprite_layer, s_sprite_ids[i], &spr) != ESP_OK)
+        if (crt_sprite_get(&s_sprite_layer, s_sprite_ids[i], &spr) != ESP_OK) {
             continue;
+        }
         int16_t nx = (int16_t)(spr.x + s_dx[i]);
         int16_t ny = (int16_t)(spr.y + s_dy[i]);
-        if (nx <= 0 || nx >= (int16_t)(256 - 16))
+        if (nx <= 0 || nx >= (int16_t)(256 - 16)) {
             s_dx[i] = (int16_t)-s_dx[i];
-        if (ny <= 0 || ny >= (int16_t)(240 - 16))
+        }
+        if (ny <= 0 || ny >= (int16_t)(240 - 16)) {
             s_dy[i] = (int16_t)-s_dy[i];
+        }
         crt_sprite_move_by(&s_sprite_layer, s_sprite_ids[i], s_dx[i], s_dy[i]);
     }
 }
@@ -344,7 +348,7 @@ static esp_err_t app_start_core(crt_video_standard_t video_standard)
         crt_sprite_layer_set_max_sprites_per_line(&s_sprite_layer, CRT_SPRITE_DEFAULT_PERLINE);
         crt_sprite_layer_set_x_scale(&s_sprite_layer, 3U);
 
-        for (uint8_t i = 0; i < APP_DEMO_SPRITE_COUNT; ++i) {
+        for (size_t i = 0; i < APP_DEMO_SPRITE_COUNT; ++i) {
             const int16_t spawn_x = (int16_t)(40 + i * 56);
             const int16_t spawn_y = (int16_t)(48 + i * 36); /* 48,84,120,156 — non-overlapping */
             esp_err_t spr_err = crt_sprite_add(&s_sprite_layer,

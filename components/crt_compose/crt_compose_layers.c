@@ -242,7 +242,7 @@ bool crt_compose_viewport_layer_fetch(void *ctx, uint16_t logical_line, uint8_t 
         return true;
     }
 
-    for (uint16_t i = 0; i < out_count; ++i) {
+    for (uint32_t i = 0; i < out_count; ++i) {
         const uint16_t source_x =
             crt_compose_wrap_i32((int32_t)i + layer->scroll_x, layer->source_width);
         idx_out[layer->viewport_x + i] = layer->scratch[source_x];

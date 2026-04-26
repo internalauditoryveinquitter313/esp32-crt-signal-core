@@ -201,8 +201,9 @@ IRAM_ATTR void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_
     uint8_t keyed_count = 0;
     for (uint8_t li = 0; li < c->layer_count; ++li) {
         const crt_compose_layer_t *layer = &c->layers[li];
-        if (!layer->enabled || layer->fetch == NULL)
+        if (!layer->enabled || layer->fetch == NULL) {
             continue;
+        }
         if (layer->transparent_idx == CRT_COMPOSE_NO_TRANSPARENCY) {
             base_idx = li;
             opaque_count++;
@@ -261,11 +262,13 @@ IRAM_ATTR void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_
         bool line_materialized = false;
 
         for (uint8_t li = 0; li < c->layer_count; ++li) {
-            if ((int)li == base_idx)
+            if ((int)li == base_idx) {
                 continue;
+            }
             const crt_compose_layer_t *layer = &c->layers[li];
-            if (!layer->enabled || layer->fetch == NULL)
+            if (!layer->enabled || layer->fetch == NULL) {
                 continue;
+            }
 
             if (!layer->fetch(layer->ctx, scanline->logical_line, c->scratch, active_width)) {
                 continue;
@@ -299,8 +302,9 @@ IRAM_ATTR void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_
         bool line_ready = false;
         for (uint8_t li = 0; li < c->layer_count; ++li) {
             const crt_compose_layer_t *layer = &c->layers[li];
-            if (!layer->enabled || layer->fetch == NULL)
+            if (!layer->enabled || layer->fetch == NULL) {
                 continue;
+            }
 
             if (layer->transparent_idx == CRT_COMPOSE_NO_TRANSPARENCY) {
                 (void)layer->fetch(layer->ctx, scanline->logical_line, c->line, active_width);

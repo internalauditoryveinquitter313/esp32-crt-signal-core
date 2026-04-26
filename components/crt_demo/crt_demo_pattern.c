@@ -95,7 +95,7 @@ static void crt_demo_pattern_render_color_bars(const crt_demo_pattern_runtime_t 
     const uint32_t *palette = k_demo_ntsc_bar_patterns;
     uint32_t packed_colors[CRT_DEMO_LOGICAL_QUAD_WIDTH];
 
-    if (sample_count < CRT_DEMO_PATTERN_LOGICAL_WIDTH * 3U) {
+    if (sample_count < (size_t)CRT_DEMO_PATTERN_LOGICAL_WIDTH * 3U) {
         return;
     }
 

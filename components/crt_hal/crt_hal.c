@@ -98,8 +98,8 @@ static esp_err_t crt_hal_configure_clock(uint32_t sample_rate_hz, bool use_apll)
         uint32_t src_clk_hz = esp_clk_apb_freq() * 2;
         hal_utils_clk_div_t mclk_div = {};
 
-        ESP_RETURN_ON_FALSE(src_clk_hz / sample_rate_hz > 1.99f, ESP_ERR_INVALID_ARG, TAG,
-                            "mclk divider below minimum");
+        ESP_RETURN_ON_FALSE((float)src_clk_hz / (float)sample_rate_hz > 1.99f, ESP_ERR_INVALID_ARG,
+                            TAG, "mclk divider below minimum");
         ESP_RETURN_ON_FALSE((src_clk_hz / sample_rate_hz) < 256, ESP_ERR_INVALID_ARG, TAG,
                             "mclk divider above maximum");
 
@@ -191,8 +191,8 @@ static esp_err_t crt_hal_alloc_dma_resources(void)
         heap_caps_calloc(s_hal.config.dma_line_count, sizeof(lldesc_t), CRT_HAL_DESC_ALLOC_CAPS);
     ESP_RETURN_ON_FALSE(s_hal.descs != NULL, ESP_ERR_NO_MEM, TAG, "failed to allocate descriptors");
 
-    s_hal.line_buffers =
-        heap_caps_calloc(s_hal.config.dma_line_count, sizeof(uint16_t *), CRT_HAL_DESC_ALLOC_CAPS);
+    s_hal.line_buffers = (uint16_t **)heap_caps_calloc(s_hal.config.dma_line_count,
+                                                       sizeof(uint16_t *), CRT_HAL_DESC_ALLOC_CAPS);
     ESP_RETURN_ON_FALSE(s_hal.line_buffers != NULL, ESP_ERR_NO_MEM, TAG,
                         "failed to allocate buffer list");
 
@@ -222,7 +222,7 @@ static void crt_hal_free_dma_resources(void)
             free(s_hal.line_buffers[i]);
             s_hal.line_buffers[i] = NULL;
         }
-        free(s_hal.line_buffers);
+        free((void *)s_hal.line_buffers);
         s_hal.line_buffers = NULL;
     }
 

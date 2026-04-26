@@ -102,8 +102,9 @@ uint8_t *crt_fb_row(const crt_fb_surface_t *surface, uint16_t y)
 
 void crt_fb_put(crt_fb_surface_t *surface, uint16_t x, uint16_t y, uint8_t value)
 {
-    if (surface == NULL || surface->buffer == NULL)
+    if (surface == NULL || surface->buffer == NULL) {
         return;
+    }
     if (x < surface->width && y < surface->height) {
         surface->buffer[(size_t)y * surface->width + x] = value;
     }
@@ -111,8 +112,9 @@ void crt_fb_put(crt_fb_surface_t *surface, uint16_t x, uint16_t y, uint8_t value
 
 uint8_t crt_fb_get(const crt_fb_surface_t *surface, uint16_t x, uint16_t y)
 {
-    if (surface == NULL || surface->buffer == NULL)
+    if (surface == NULL || surface->buffer == NULL) {
         return 0;
+    }
     if (x < surface->width && y < surface->height) {
         return surface->buffer[(size_t)y * surface->width + x];
     }

@@ -20,8 +20,9 @@ static inline bool is_pow2(uint16_t v)
 static inline uint16_t wrap_u16(int v, int mod)
 {
     int r = v % mod;
-    if (r < 0)
+    if (r < 0) {
         r += mod;
+    }
     return (uint16_t)r;
 }
 
@@ -63,26 +64,31 @@ esp_err_t crt_tile_init(crt_tile_layer_t *t, uint16_t visible_w, uint16_t visibl
 
 void crt_tile_set_tile(crt_tile_layer_t *t, uint16_t col, uint16_t row, uint8_t tile_idx)
 {
-    if (t == NULL || t->nametable == NULL)
+    if (t == NULL || t->nametable == NULL) {
         return;
-    if (col >= t->pitch_w_tiles || row >= t->pitch_h_tiles)
+    }
+    if (col >= t->pitch_w_tiles || row >= t->pitch_h_tiles) {
         return;
+    }
     t->nametable[(size_t)row * t->pitch_w_tiles + col] = tile_idx;
 }
 
 uint8_t crt_tile_get_tile(const crt_tile_layer_t *t, uint16_t col, uint16_t row)
 {
-    if (t == NULL || t->nametable == NULL)
+    if (t == NULL || t->nametable == NULL) {
         return 0;
-    if (col >= t->pitch_w_tiles || row >= t->pitch_h_tiles)
+    }
+    if (col >= t->pitch_w_tiles || row >= t->pitch_h_tiles) {
         return 0;
+    }
     return t->nametable[(size_t)row * t->pitch_w_tiles + col];
 }
 
 void crt_tile_set_scroll(crt_tile_layer_t *t, int x_px, int y_px)
 {
-    if (t == NULL)
+    if (t == NULL) {
         return;
+    }
     const int vw_px = (int)t->visible_w_tiles * (int)CRT_TILE_PX_W;
     const int vh_px = (int)t->visible_h_tiles * (int)CRT_TILE_PX_H;
     t->scroll_x_px = wrap_u16(x_px, vw_px);
@@ -91,8 +97,9 @@ void crt_tile_set_scroll(crt_tile_layer_t *t, int x_px, int y_px)
 
 void crt_tile_set_palette(crt_tile_layer_t *t, const uint16_t *palette)
 {
-    if (t == NULL)
+    if (t == NULL) {
         return;
+    }
     t->palette = palette;
 }
 
@@ -139,13 +146,15 @@ static IRAM_ATTR void tile_render_logical_line(const crt_tile_layer_t *t, uint16
         const uint16_t wrapped_col = (t->pitch_w_mask != 0u) ? (uint16_t)(col & t->pitch_w_mask)
                                                              : (uint16_t)(col % t->pitch_w_tiles);
         uint8_t idx = nametable_row[wrapped_col];
-        if (idx >= pattern_count)
+        if (idx >= pattern_count) {
             idx = 0;
+        }
         const uint8_t *tile_line =
             &pattern[(size_t)idx * CRT_TILE_BYTES + (size_t)fine_y * CRT_TILE_PX_W];
         uint16_t take = (uint16_t)(CRT_TILE_PX_W - fine);
-        if (take > remaining)
+        if (take > remaining) {
             take = remaining;
+        }
         for (uint16_t i = 0; i < take; ++i) {
             dst[i] = tile_line[fine + i];
         }
@@ -162,8 +171,9 @@ IRAM_ATTR bool crt_tile_layer_fetch(void *ctx, uint16_t logical_line, uint8_t *i
                                     uint16_t width)
 {
     crt_tile_layer_t *t = (crt_tile_layer_t *)ctx;
-    if (t == NULL || idx_out == NULL || width == 0u)
+    if (t == NULL || idx_out == NULL || width == 0u) {
         return false;
+    }
 
     const uint16_t visible_h_px = (uint16_t)(t->visible_h_tiles * CRT_TILE_PX_H);
     if (logical_line >= visible_h_px) {
@@ -177,7 +187,7 @@ IRAM_ATTR bool crt_tile_layer_fetch(void *ctx, uint16_t logical_line, uint8_t *i
      * width is 256 pixels for the common 32-tile case. Capped at
      * CRT_TILE_MAX_LOGICAL_W to bound stack usage on exotic configs. */
     uint8_t logical_line_buf[CRT_TILE_STACK_LOGICAL_W];
-    if (logical_w_px > CRT_TILE_STACK_LOGICAL_W) {
+    if (logical_w_px == 0u || logical_w_px > CRT_TILE_STACK_LOGICAL_W) {
         memset(idx_out, 0, width);
         return true;
     }
@@ -228,7 +238,7 @@ IRAM_ATTR void crt_tile_scanline_hook(const crt_scanline_t *scanline, uint16_t *
     const uint16_t logical_w_px = (uint16_t)(t->visible_w_tiles * CRT_TILE_PX_W);
 
     uint8_t logical_line_buf[CRT_TILE_STACK_LOGICAL_W];
-    if (logical_w_px > CRT_TILE_STACK_LOGICAL_W) {
+    if (logical_w_px == 0u || logical_w_px > CRT_TILE_STACK_LOGICAL_W) {
         return;
     }
     tile_render_logical_line(t, scanline->logical_line, logical_line_buf);

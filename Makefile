@@ -40,6 +40,18 @@ TEST_INC    := -I tests/stubs \
                -I components/crt_tile/include \
                -I components/crt_hal/include
 TEST_OUT    := /tmp
+LINT_SOURCES := components/crt_core/crt_waveform.c \
+                components/crt_core/crt_line_policy.c \
+                components/crt_core/crt_composite_palette.c \
+                components/crt_hal/crt_hal_clock.c \
+                components/crt_timing/crt_timing.c \
+                components/crt_demo/crt_demo_pattern.c \
+                components/crt_fb/crt_fb.c \
+                components/crt_compose/crt_compose.c \
+                components/crt_compose/crt_compose_layers.c \
+                components/crt_compose/crt_sprite.c \
+                components/crt_tile/crt_tile.c \
+                components/crt_stimulus/crt_stimulus.c
 
 .PHONY: test test-core test-render test-burst test-policy test-timing test-demo test-hal-clock \
         test-composite-palette test-scanline-abi test-scanline-header test-fb test-compose \
@@ -124,8 +136,8 @@ format:  ## Run clang-format on all project sources
 	@find components main -name '*.c' -o -name '*.h' | xargs clang-format -i
 	@echo "✓ Formatted"
 
-lint:  ## Run clang-tidy on project sources
-	@find components main -name '*.c' | xargs clang-tidy -p build --quiet 2>/dev/null || true
+lint:  ## Run clang-tidy on host-portable project sources
+	@clang-tidy $(LINT_SOURCES) --quiet -- $(TEST_CFLAGS) $(TEST_INC)
 	@echo "✓ Lint done"
 
 # ── Help ─────────────────────────────────────────────────────────────

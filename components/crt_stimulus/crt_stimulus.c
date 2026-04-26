@@ -1,5 +1,7 @@
 #include "crt_stimulus.h"
 
+#include "esp_attr.h"
+
 #include <string.h>
 
 #define CRT_STIMULUS_DEFAULT_HEIGHT 240U
@@ -13,7 +15,7 @@ static uint8_t scale_u8(uint32_t value, uint32_t max_value)
     return (uint8_t)((value * 255U) / max_value);
 }
 
-static uint32_t stimulus_hash(uint32_t x, uint32_t y, uint32_t frame, uint32_t seed)
+IRAM_ATTR static uint32_t stimulus_hash(uint32_t x, uint32_t y, uint32_t frame, uint32_t seed)
 {
     uint32_t h = seed ^ (x * 0x9E3779B1u) ^ (y * 0x85EBCA77u) ^ (frame * 0xC2B2AE3Du);
     h ^= h >> 16;
@@ -95,15 +97,15 @@ static void fill_horizontal_ramp(uint8_t *idx_out, uint16_t width)
     }
 }
 
-static void fill_vertical_ramp(const crt_stimulus_t *stimulus, uint16_t logical_line,
-                               uint8_t *idx_out, uint16_t width)
+IRAM_ATTR static void fill_vertical_ramp(const crt_stimulus_t *stimulus, uint16_t logical_line,
+                                         uint8_t *idx_out, uint16_t width)
 {
     const uint32_t max_y = (uint32_t)stimulus->config.height - 1U;
     memset(idx_out, scale_u8(logical_line, max_y), width);
 }
 
-static void fill_checker(const crt_stimulus_t *stimulus, uint16_t logical_line, uint8_t *idx_out,
-                         uint16_t width)
+IRAM_ATTR static void fill_checker(const crt_stimulus_t *stimulus, uint16_t logical_line,
+                                   uint8_t *idx_out, uint16_t width)
 {
     const uint16_t row = logical_line / stimulus->config.cell_h;
     for (uint16_t x = 0; x < width; ++x) {
@@ -113,8 +115,8 @@ static void fill_checker(const crt_stimulus_t *stimulus, uint16_t logical_line, 
     }
 }
 
-static void fill_prbs(const crt_stimulus_t *stimulus, uint16_t logical_line, uint8_t *idx_out,
-                      uint16_t width)
+IRAM_ATTR static void fill_prbs(const crt_stimulus_t *stimulus, uint16_t logical_line,
+                                uint8_t *idx_out, uint16_t width)
 {
     const uint32_t frame = stimulus->frame;
     const uint32_t seed = stimulus->config.seed;
@@ -125,8 +127,8 @@ static void fill_prbs(const crt_stimulus_t *stimulus, uint16_t logical_line, uin
     }
 }
 
-static void fill_impulse(const crt_stimulus_t *stimulus, uint16_t logical_line, uint8_t *idx_out,
-                         uint16_t width)
+IRAM_ATTR static void fill_impulse(const crt_stimulus_t *stimulus, uint16_t logical_line,
+                                   uint8_t *idx_out, uint16_t width)
 {
     memset(idx_out, stimulus->config.low_idx, width);
 
@@ -144,8 +146,8 @@ static void fill_impulse(const crt_stimulus_t *stimulus, uint16_t logical_line, 
     }
 }
 
-static void fill_chirp(const crt_stimulus_t *stimulus, uint16_t logical_line, uint8_t *idx_out,
-                       uint16_t width)
+IRAM_ATTR static void fill_chirp(const crt_stimulus_t *stimulus, uint16_t logical_line,
+                                 uint8_t *idx_out, uint16_t width)
 {
     const uint32_t max_y = (uint32_t)stimulus->config.height - 1U;
     uint16_t period = (uint16_t)(2U + ((uint32_t)logical_line * 62U / (max_y ? max_y : 1U)));
@@ -161,8 +163,8 @@ static void fill_chirp(const crt_stimulus_t *stimulus, uint16_t logical_line, ui
     }
 }
 
-static void fill_frame_markers(const crt_stimulus_t *stimulus, uint16_t logical_line,
-                               uint8_t *idx_out, uint16_t width)
+IRAM_ATTR static void fill_frame_markers(const crt_stimulus_t *stimulus, uint16_t logical_line,
+                                         uint8_t *idx_out, uint16_t width)
 {
     memset(idx_out, stimulus->config.mid_idx, width);
 
@@ -190,7 +192,8 @@ static void fill_frame_markers(const crt_stimulus_t *stimulus, uint16_t logical_
     }
 }
 
-bool crt_stimulus_layer_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out, uint16_t width)
+IRAM_ATTR bool crt_stimulus_layer_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out,
+                                        uint16_t width)
 {
     const crt_stimulus_t *stimulus = (const crt_stimulus_t *)ctx;
     if (stimulus == NULL || idx_out == NULL || width == 0 ||

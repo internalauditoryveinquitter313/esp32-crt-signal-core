@@ -217,8 +217,9 @@ bool crt_sprite_layer_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out, 
     bool any_y_match = false;
     for (uint8_t i = 0; i < layer->sprite_count; ++i) {
         const crt_sprite_t *sprite = &layer->sprites[i];
-        if (!sprite->enabled)
+        if (!sprite->enabled) {
             continue;
+        }
         const int32_t rel_y = (int32_t)logical_line - sprite->y;
         const uint8_t sprite_px = crt_sprite_size_px(sprite->size);
         if (rel_y >= 0 && rel_y < sprite_px) {
