@@ -1,12 +1,12 @@
 #ifndef CRT_COMPOSE_H
 #define CRT_COMPOSE_H
 
-#include <stdint.h>
-#include <stdbool.h>
+#include "crt_scanline.h"
 
 #include "esp_err.h"
 
-#include "crt_scanline.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +45,9 @@ extern "C" {
 /** Sentinel for layers without keyed transparency (fully opaque overwrite). */
 #define CRT_COMPOSE_NO_TRANSPARENCY ((uint16_t)0xFFFFu)
 
+/** Sentinel returned by layer-creation helpers when no layer was created. */
+#define CRT_COMPOSE_LAYER_INVALID ((uint8_t)0xFFu)
+
 /**
  * @brief Layer fetch callback.
  *
@@ -65,9 +68,7 @@ extern "C" {
  * @param width        Number of pixels to emit.
  * @return             True if the layer contributed to this line.
  */
-typedef bool (*crt_layer_fetch_fn)(void *ctx,
-                                   uint16_t logical_line,
-                                   uint8_t *idx_out,
+typedef bool (*crt_layer_fetch_fn)(void *ctx, uint16_t logical_line, uint8_t *idx_out,
                                    uint16_t width);
 
 typedef struct {
@@ -92,6 +93,14 @@ typedef struct {
 } crt_compose_layer_t;
 
 typedef struct {
+    crt_layer_fetch_fn fetch;
+    crt_scanline_hook_fn scanline_override;
+    void *ctx;
+    uint16_t transparent_idx;
+    bool enabled;
+} crt_compose_layer_info_t;
+
+typedef struct {
     crt_compose_layer_t layers[CRT_COMPOSE_MAX_LAYERS];
     uint8_t layer_count;
 
@@ -111,9 +120,7 @@ typedef struct {
 
 esp_err_t crt_compose_init(crt_compose_t *c);
 
-esp_err_t crt_compose_set_palette(crt_compose_t *c,
-                                  const uint16_t *palette,
-                                  uint16_t size);
+esp_err_t crt_compose_set_palette(crt_compose_t *c, const uint16_t *palette, uint16_t size);
 
 void crt_compose_set_clear_index(crt_compose_t *c, uint8_t idx);
 
@@ -126,10 +133,17 @@ void crt_compose_set_clear_index(crt_compose_t *c, uint8_t idx);
  *
  * @return ESP_OK on success, ESP_ERR_NO_MEM if the layer stack is full.
  */
-esp_err_t crt_compose_add_layer(crt_compose_t *c,
-                                crt_layer_fetch_fn fetch,
-                                void *ctx,
+esp_err_t crt_compose_add_layer(crt_compose_t *c, crt_layer_fetch_fn fetch, void *ctx,
                                 uint16_t transparent_idx);
+
+/**
+ * @brief Append a layer and return its stack index.
+ *
+ * Use this when the caller needs to mutate the layer later, for example to
+ * toggle visibility, change its transparency key, or reorder priority.
+ */
+esp_err_t crt_compose_add_layer_with_id(crt_compose_t *c, crt_layer_fetch_fn fetch, void *ctx,
+                                        uint16_t transparent_idx, uint8_t *out_layer_idx);
 
 /**
  * @brief Append an opaque layer that also exposes a fused scanline hook.
@@ -141,16 +155,33 @@ esp_err_t crt_compose_add_layer(crt_compose_t *c,
  *
  * @return ESP_OK on success, ESP_ERR_NO_MEM if the layer stack is full.
  */
-esp_err_t crt_compose_add_layer_fused(crt_compose_t *c,
-                                      crt_layer_fetch_fn fetch,
-                                      crt_scanline_hook_fn scanline_override,
-                                      void *ctx);
+esp_err_t crt_compose_add_layer_fused(crt_compose_t *c, crt_layer_fetch_fn fetch,
+                                      crt_scanline_hook_fn scanline_override, void *ctx);
+
+/**
+ * @brief Append a fused opaque layer and return its stack index.
+ */
+esp_err_t crt_compose_add_layer_fused_with_id(crt_compose_t *c, crt_layer_fetch_fn fetch,
+                                              crt_scanline_hook_fn scanline_override, void *ctx,
+                                              uint8_t *out_layer_idx);
 
 void crt_compose_clear_layers(crt_compose_t *c);
 
-void crt_compose_set_layer_enabled(crt_compose_t *c,
-                                   uint8_t layer_idx,
-                                   bool enabled);
+void crt_compose_set_layer_enabled(crt_compose_t *c, uint8_t layer_idx, bool enabled);
+
+esp_err_t crt_compose_get_layer_info(const crt_compose_t *c, uint8_t layer_idx,
+                                     crt_compose_layer_info_t *out_info);
+
+esp_err_t crt_compose_set_layer_fetch(crt_compose_t *c, uint8_t layer_idx, crt_layer_fetch_fn fetch,
+                                      void *ctx);
+
+esp_err_t crt_compose_set_layer_context(crt_compose_t *c, uint8_t layer_idx, void *ctx);
+
+esp_err_t crt_compose_set_layer_transparent_index(crt_compose_t *c, uint8_t layer_idx,
+                                                  uint16_t transparent_idx);
+
+esp_err_t crt_compose_swap_layers(crt_compose_t *c, uint8_t first_layer_idx,
+                                  uint8_t second_layer_idx);
 
 /* ── Scanline hook ────────────────────────────────────────────────── */
 
@@ -160,10 +191,8 @@ void crt_compose_set_layer_enabled(crt_compose_t *c,
  *
  * Register with: `crt_register_scanline_hook(crt_compose_scanline_hook, &c);`
  */
-void crt_compose_scanline_hook(const crt_scanline_t *scanline,
-                               uint16_t *active_buf,
-                               uint16_t active_width,
-                               void *user_data);
+void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_t *active_buf,
+                               uint16_t active_width, void *user_data);
 
 #ifdef __cplusplus
 }

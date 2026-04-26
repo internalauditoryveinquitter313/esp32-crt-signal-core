@@ -14,7 +14,8 @@ esp_err_t crt_compose_init(crt_compose_t *c)
     return ESP_OK;
 }
 
-esp_err_t crt_compose_set_palette(crt_compose_t *c, const uint16_t *palette, uint16_t size) {
+esp_err_t crt_compose_set_palette(crt_compose_t *c, const uint16_t *palette, uint16_t size)
+{
     ESP_RETURN_ON_FALSE(c != NULL, ESP_ERR_INVALID_ARG, "crt_compose", "null state");
     ESP_RETURN_ON_FALSE(palette == NULL || size >= 256U, ESP_ERR_INVALID_SIZE, "crt_compose",
                         "indexed-8 palette requires 256 entries");
@@ -34,33 +35,59 @@ void crt_compose_set_clear_index(crt_compose_t *c, uint8_t idx)
 
 static esp_err_t crt_compose_append_layer(crt_compose_t *c, crt_layer_fetch_fn fetch,
                                           crt_scanline_hook_fn scanline_override, void *ctx,
-                                          uint16_t transparent_idx) {
+                                          uint16_t transparent_idx, uint8_t *out_layer_idx)
+{
     ESP_RETURN_ON_FALSE(c != NULL, ESP_ERR_INVALID_ARG, "crt_compose", "null state");
     ESP_RETURN_ON_FALSE(fetch != NULL, ESP_ERR_INVALID_ARG, "crt_compose", "null fetch");
-    ESP_RETURN_ON_FALSE(c->layer_count<CRT_COMPOSE_MAX_LAYERS, ESP_ERR_NO_MEM, "crt_compose",
-        "layer stack full");
+    ESP_RETURN_ON_FALSE(c->layer_count < CRT_COMPOSE_MAX_LAYERS, ESP_ERR_NO_MEM, "crt_compose",
+                        "layer stack full");
 
-    c->layers[c->layer_count] = (crt_compose_layer_t)
-    {
+    const uint8_t layer_idx = c->layer_count;
+    c->layers[c->layer_count] = (crt_compose_layer_t){
         .fetch = fetch,
-        .
-        scanline_override = scanline_override,
+        .scanline_override = scanline_override,
         .ctx = ctx,
         .transparent_idx = transparent_idx,
         .enabled = true,
     };
     c->layer_count++;
+    if (out_layer_idx != NULL) {
+        *out_layer_idx = layer_idx;
+    }
     return ESP_OK;
 }
 
 esp_err_t crt_compose_add_layer(crt_compose_t *c, crt_layer_fetch_fn fetch, void *ctx,
-                                uint16_t transparent_idx) {
-    return crt_compose_append_layer(c, fetch, NULL, ctx, transparent_idx);
+                                uint16_t transparent_idx)
+{
+    return crt_compose_append_layer(c, fetch, NULL, ctx, transparent_idx, NULL);
+}
+
+esp_err_t crt_compose_add_layer_with_id(crt_compose_t *c, crt_layer_fetch_fn fetch, void *ctx,
+                                        uint16_t transparent_idx, uint8_t *out_layer_idx)
+{
+    if (out_layer_idx != NULL) {
+        *out_layer_idx = CRT_COMPOSE_LAYER_INVALID;
+    }
+    return crt_compose_append_layer(c, fetch, NULL, ctx, transparent_idx, out_layer_idx);
 }
 
 esp_err_t crt_compose_add_layer_fused(crt_compose_t *c, crt_layer_fetch_fn fetch,
-                                      crt_scanline_hook_fn scanline_override, void *ctx) {
-    return crt_compose_append_layer(c, fetch, scanline_override, ctx, CRT_COMPOSE_NO_TRANSPARENCY);
+                                      crt_scanline_hook_fn scanline_override, void *ctx)
+{
+    return crt_compose_append_layer(c, fetch, scanline_override, ctx, CRT_COMPOSE_NO_TRANSPARENCY,
+                                    NULL);
+}
+
+esp_err_t crt_compose_add_layer_fused_with_id(crt_compose_t *c, crt_layer_fetch_fn fetch,
+                                              crt_scanline_hook_fn scanline_override, void *ctx,
+                                              uint8_t *out_layer_idx)
+{
+    if (out_layer_idx != NULL) {
+        *out_layer_idx = CRT_COMPOSE_LAYER_INVALID;
+    }
+    return crt_compose_append_layer(c, fetch, scanline_override, ctx, CRT_COMPOSE_NO_TRANSPARENCY,
+                                    out_layer_idx);
 }
 
 void crt_compose_clear_layers(crt_compose_t *c)
@@ -77,10 +104,83 @@ void crt_compose_set_layer_enabled(crt_compose_t *c, uint8_t layer_idx, bool ena
     }
 }
 
+static bool crt_compose_layer_idx_valid(const crt_compose_t *c, uint8_t layer_idx)
+{
+    return c != NULL && layer_idx < c->layer_count;
+}
+
+esp_err_t crt_compose_get_layer_info(const crt_compose_t *c, uint8_t layer_idx,
+                                     crt_compose_layer_info_t *out_info)
+{
+    ESP_RETURN_ON_FALSE(crt_compose_layer_idx_valid(c, layer_idx), ESP_ERR_INVALID_ARG,
+                        "crt_compose", "invalid layer");
+    ESP_RETURN_ON_FALSE(out_info != NULL, ESP_ERR_INVALID_ARG, "crt_compose", "null out_info");
+
+    const crt_compose_layer_t *layer = &c->layers[layer_idx];
+    *out_info = (crt_compose_layer_info_t){
+        .fetch = layer->fetch,
+        .scanline_override = layer->scanline_override,
+        .ctx = layer->ctx,
+        .transparent_idx = layer->transparent_idx,
+        .enabled = layer->enabled,
+    };
+    return ESP_OK;
+}
+
+esp_err_t crt_compose_set_layer_fetch(crt_compose_t *c, uint8_t layer_idx, crt_layer_fetch_fn fetch,
+                                      void *ctx)
+{
+    ESP_RETURN_ON_FALSE(crt_compose_layer_idx_valid(c, layer_idx), ESP_ERR_INVALID_ARG,
+                        "crt_compose", "invalid layer");
+    ESP_RETURN_ON_FALSE(fetch != NULL, ESP_ERR_INVALID_ARG, "crt_compose", "null fetch");
+
+    c->layers[layer_idx].fetch = fetch;
+    c->layers[layer_idx].ctx = ctx;
+    return ESP_OK;
+}
+
+esp_err_t crt_compose_set_layer_context(crt_compose_t *c, uint8_t layer_idx, void *ctx)
+{
+    ESP_RETURN_ON_FALSE(crt_compose_layer_idx_valid(c, layer_idx), ESP_ERR_INVALID_ARG,
+                        "crt_compose", "invalid layer");
+
+    c->layers[layer_idx].ctx = ctx;
+    return ESP_OK;
+}
+
+esp_err_t crt_compose_set_layer_transparent_index(crt_compose_t *c, uint8_t layer_idx,
+                                                  uint16_t transparent_idx)
+{
+    ESP_RETURN_ON_FALSE(crt_compose_layer_idx_valid(c, layer_idx), ESP_ERR_INVALID_ARG,
+                        "crt_compose", "invalid layer");
+
+    c->layers[layer_idx].transparent_idx = transparent_idx;
+    return ESP_OK;
+}
+
+esp_err_t crt_compose_swap_layers(crt_compose_t *c, uint8_t first_layer_idx,
+                                  uint8_t second_layer_idx)
+{
+    ESP_RETURN_ON_FALSE(crt_compose_layer_idx_valid(c, first_layer_idx), ESP_ERR_INVALID_ARG,
+                        "crt_compose", "invalid first layer");
+    ESP_RETURN_ON_FALSE(crt_compose_layer_idx_valid(c, second_layer_idx), ESP_ERR_INVALID_ARG,
+                        "crt_compose", "invalid second layer");
+
+    if (first_layer_idx == second_layer_idx) {
+        return ESP_OK;
+    }
+
+    crt_compose_layer_t tmp = c->layers[first_layer_idx];
+    c->layers[first_layer_idx] = c->layers[second_layer_idx];
+    c->layers[second_layer_idx] = tmp;
+    return ESP_OK;
+}
+
 /* ── Scanline hook ────────────────────────────────────────────────── */
 
 IRAM_ATTR void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_t *active_buf,
-                                         uint16_t active_width, void *user_data) {
+                                         uint16_t active_width, void *user_data)
+{
     crt_compose_t *c = (crt_compose_t *)user_data;
 
     if (scanline == NULL || c == NULL || active_buf == NULL || active_width == 0 ||
@@ -112,7 +212,7 @@ IRAM_ATTR void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_
         }
     }
     const bool base_fused_eligible =
-            (opaque_count == 1) && (c->layers[base_idx].scanline_override != NULL);
+        (opaque_count == 1) && (c->layers[base_idx].scanline_override != NULL);
 
     /* Fused hot path for the common PPU-style case: one opaque base with
      * scanline_override + exactly one keyed overlay. Collapses
@@ -126,7 +226,7 @@ IRAM_ATTR void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_
             return;
         }
 
-        (void) base->fetch(base->ctx, scanline->logical_line, c->line, active_width);
+        (void)base->fetch(base->ctx, scanline->logical_line, c->line, active_width);
 
         const uint8_t key = (uint8_t)keyed->transparent_idx;
         const uint16_t *pal = c->palette;
@@ -161,7 +261,7 @@ IRAM_ATTR void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_
         bool line_materialized = false;
 
         for (uint8_t li = 0; li < c->layer_count; ++li) {
-            if ((int) li == base_idx)
+            if ((int)li == base_idx)
                 continue;
             const crt_compose_layer_t *layer = &c->layers[li];
             if (!layer->enabled || layer->fetch == NULL)
@@ -172,7 +272,7 @@ IRAM_ATTR void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_
             }
 
             if (!line_materialized) {
-                (void) base->fetch(base->ctx, scanline->logical_line, c->line, active_width);
+                (void)base->fetch(base->ctx, scanline->logical_line, c->line, active_width);
                 line_materialized = true;
             }
 
@@ -203,7 +303,7 @@ IRAM_ATTR void crt_compose_scanline_hook(const crt_scanline_t *scanline, uint16_
                 continue;
 
             if (layer->transparent_idx == CRT_COMPOSE_NO_TRANSPARENCY) {
-                (void) layer->fetch(layer->ctx, scanline->logical_line, c->line, active_width);
+                (void)layer->fetch(layer->ctx, scanline->logical_line, c->line, active_width);
                 line_ready = true;
                 continue;
             }
