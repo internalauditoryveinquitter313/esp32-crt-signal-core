@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./.github/assets/readme-hero.svg" alt="CRT Signal Core - Deterministic Composite Video Engine for ESP32" width="100%"/>
+<img src="assets/readme-hero.svg" alt="CRT Signal Core - Deterministic Composite Video Engine for ESP32" width="100%"/>
 
 
 
@@ -11,8 +11,8 @@
   <a href="https://docs.espressif.com/projects/esp-idf/"><img src="https://img.shields.io/badge/ESP--IDF-5.4%2B-ff4aa2?style=flat-square&labelColor=211826" alt="ESP-IDF 5.4+"/></a>
   <a href="https://en.wikipedia.org/wiki/C11_(C_standard_revision)"><img src="https://img.shields.io/badge/C11-embedded-27d7e8?style=flat-square&labelColor=211826" alt="C11 Embedded"/></a>
   <a href="https://www.espressif.com/en/products/socs/esp32"><img src="https://img.shields.io/badge/ESP32--D0WD--V3-GPIO25-ffd15a?style=flat-square&labelColor=211826" alt="ESP32-D0WD-V3 GPIO25"/></a>
-  <a href="./tests"><img src="https://img.shields.io/badge/tests-host%20checked-9d7cff?style=flat-square&labelColor=211826" alt="Tests host checked"/></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-27d7e8?style=flat-square&labelColor=211826" alt="License MIT"/></a>
+  <a href="../tests"><img src="https://img.shields.io/badge/tests-host%20checked-9d7cff?style=flat-square&labelColor=211826" alt="Tests host checked"/></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-MIT-27d7e8?style=flat-square&labelColor=211826" alt="License MIT"/></a>
 </p>
 
 ---
@@ -112,16 +112,16 @@ flowchart LR
 
 | Component             | Role                               | Key Constraint                   |
 |:----------------------|:-----------------------------------|:---------------------------------|
-| **`crt_core`**        | Engine — orchestrates the pipeline | No alloc after `start()`         |
-| **`crt_hal`**         | I2S0 + DAC hardware abstraction    | GPIO25 only, internal SRAM DMA   |
-| **`crt_timing`**      | NTSC/PAL timing profiles           | µs-precise blanking/sync tables  |
-| **`crt_waveform`**    | Burst & chroma synthesis           | 3.579545 MHz NTSC colorburst     |
-| **`crt_line_policy`** | Per-line type decisions            | VBI, sync, active classification |
-| **`crt_demo`**        | Test pattern generator             | Color bars, ramps, grids         |
-| **`crt_diag`**        | Runtime telemetry                  | Late line detection, ISR stats   |
-| **`crt_fb`**          | Indexed-8 framebuffer adapter      | Hook-based active video source   |
-| **`crt_compose`**     | Indexed-8 scanline compositor      | Z-order + keyed transparency     |
-| **`crt_tile`**        | PPU-style tilemap backend          | 8x8 patterns + fast expansion    |
+| **`crt_core`**        | Engine — orchestrates the pipeline       | No alloc after `start()`         |
+| **`crt_hal`**         | I2S0 + DAC hardware abstraction          | GPIO25 only, internal SRAM DMA   |
+| **`crt_timing`**      | NTSC/PAL timing profiles                 | µs-precise blanking/sync tables  |
+| **`crt_waveform`**    | Burst & chroma synthesis                 | NTSC/PAL colorburst phase        |
+| **`crt_line_policy`** | Per-line type decisions                  | VBI, sync, active classification |
+| **`crt_demo`**        | Test pattern generator                   | Color bars, ramps, grids         |
+| **`crt_diag`**        | Runtime telemetry                        | Late line detection, ISR stats   |
+| **`crt_fb`**          | Indexed-8 / RGB332 framebuffer adapters  | Hook-based active video source   |
+| **`crt_compose`**     | Indexed-8 scanline compositor            | Z-order + keyed transparency     |
+| **`crt_tile`**        | PPU-style tilemap backend                | 8x8 patterns + fast expansion    |
 
 ---
 
@@ -265,9 +265,16 @@ Configure these with `idf.py menuconfig`:
 |:--------------------------------------|:----------------------------------------------|
 | `CRT_VIDEO_STANDARD`                  | Selects NTSC or PAL timing                    |
 | `CRT_ENABLE_COLOR`                    | Enables chroma burst and color demo output    |
+| `CRT_RENDER_MODE`                     | Selects compositor demo or direct RGB332 FB   |
 | `CRT_ENABLE_UART_UPLOAD`              | Enables experimental UART0 framebuffer upload |
 | `CRT_TEST_STANDARD_TOGGLE`            | Alternates NTSC/PAL at runtime for testing    |
 | `CRT_TEST_STANDARD_TOGGLE_INTERVAL_S` | Seconds between standard switches             |
+
+`CRT_RENDER_MODE_RGB332_FB` enables a direct 256x240 RGB332 framebuffer path
+using ESP_8_BIT-derived composite color lookup tables. The default remains
+`CRT_RENDER_MODE_COMPOSE`, which exercises the tile/compositor pipeline. PAL
+timing and sync remain owned by this project; ESP_8_BIT_composite is used only
+as a reference for proven RGB332 DAC tables and APLL coefficients.
 
 ### Running Tests (Host)
 
@@ -296,13 +303,13 @@ make test-render
 
 ## 📜 License
 
-[MIT](./LICENSE) — Gabriel Maia
+[MIT](../LICENSE) — Gabriel Maia
 
 ---
 
 <div align="center">
 
-<img src="./.github/assets/readme-footer.svg" alt="Built with phosphor persistence and scanline discipline." width="100%"/>
+<img src="assets/readme-footer.svg" alt="Built with phosphor persistence and scanline discipline." width="100%"/>
 
 *Built with phosphor persistence and scanline discipline.*
 
