@@ -116,18 +116,20 @@ flowchart LR
 
 ## 📦 Components
 
-| Component             | Role                               | Key Constraint                   |
-|:----------------------|:-----------------------------------|:---------------------------------|
-| **`crt_core`**        | Engine — orchestrates the pipeline       | No alloc after `start()`         |
-| **`crt_hal`**         | I2S0 + DAC hardware abstraction          | GPIO25 only, internal SRAM DMA   |
-| **`crt_timing`**      | NTSC/PAL timing profiles                 | µs-precise blanking/sync tables  |
-| **`crt_waveform`**    | Burst & chroma synthesis                 | NTSC/PAL colorburst phase        |
-| **`crt_line_policy`** | Per-line type decisions                  | VBI, sync, active classification |
-| **`crt_demo`**        | Test pattern generator                   | Color bars, ramps, grids         |
-| **`crt_diag`**        | Runtime telemetry                        | Late line detection, ISR stats   |
-| **`crt_fb`**          | Indexed-8 / RGB332 framebuffer adapters  | Hook-based active video source   |
-| **`crt_compose`**     | Indexed-8 scanline compositor            | Z-order + keyed transparency     |
-| **`crt_tile`**        | PPU-style tilemap backend                | 8x8 patterns + fast expansion    |
+| Component             | Role                                    | Key Constraint                   |
+|:----------------------|:----------------------------------------|:---------------------------------|
+| **`crt_core`**        | Engine — orchestrates the pipeline      | No alloc after `start()`         |
+| **`crt_hal`**         | I2S0 + DAC hardware abstraction         | GPIO25 only, internal SRAM DMA   |
+| **`crt_timing`**      | NTSC/PAL timing profiles                | µs-precise blanking/sync tables  |
+| **`crt_waveform`**    | Burst & chroma synthesis                | NTSC/PAL colorburst phase        |
+| **`crt_line_policy`** | Per-line type decisions                 | VBI, sync, active classification |
+| **`crt_demo`**        | Test pattern generator                  | Color bars, ramps, grids         |
+| **`crt_diag`**        | Runtime telemetry                       | Late line detection, ISR stats   |
+| **`crt_fb`**          | Indexed-8 / RGB332 framebuffer adapters | Hook-based active video source   |
+| **`crt_compose`**     | Indexed-8 scanline compositor           | Z-order + keyed transparency     |
+| **`crt_sprite`**      | Atlas-backed OAM sprite layer           | Per-scanline sprite cap          |
+| **`crt_stimulus`**    | Measurement stimulus layer              | Deterministic capture patterns   |
+| **`crt_tile`**        | PPU-style tilemap backend               | 8x8 patterns + fast expansion    |
 
 ---
 
@@ -173,6 +175,51 @@ flowchart LR
 
 ---
 
+## 🎛️ 8-bit Compositor
+
+`crt_compose` is the scanline compositor layer. It resolves indexed-8 layers
+back-to-front, applies keyed transparency, maps the final index line through a
+DAC palette, and emits I2S-swapped active-video samples.
+
+```c
+#include "crt_compose.h"
+#include "crt_compose_layers.h"
+
+static crt_compose_t compose;
+static crt_compose_solid_layer_t bg;
+static crt_compose_rect_layer_t cursor;
+static uint8_t cursor_layer;
+
+void setup_compositor(const uint16_t palette[256])
+{
+    crt_compose_init(&compose);
+    crt_compose_set_palette(&compose, palette, 256);
+
+    crt_compose_solid_layer_init(&bg, 4);
+    crt_compose_add_layer(&compose, crt_compose_solid_layer_fetch, &bg,
+                          CRT_COMPOSE_NO_TRANSPARENCY);
+
+    crt_compose_rect_layer_init(&cursor, 32, 24, 16, 16, 15, 0);
+    crt_compose_add_layer_with_id(&compose, crt_compose_rect_layer_fetch,
+                                  &cursor, 0, &cursor_layer);
+
+    crt_register_scanline_hook(crt_compose_scanline_hook, &compose);
+}
+```
+
+Built-in layer fetchers currently cover solid fills, rectangular overlays,
+checker patterns, and viewport/scroll adapters that can wrap any other layer
+fetcher. Framebuffer and tilemap adapters plug into the same stack. Layer IDs
+allow runtime visibility, context, transparency-key, and priority updates
+without rebuilding the compositor.
+
+Sprites use a shared 8x8-cell atlas and render through one keyed
+`crt_sprite_layer_t`, not one `crt_compose` layer per sprite. The OAM layer has
+a deterministic `max_sprites_per_line` cap plus overflow counters, so sprite
+cost stays bounded and `crt_diag` underruns can remain at zero during bring-up.
+
+---
+
 ## 📐 Timing Reference
 
 | Parameter        |              NTSC |                 PAL |
@@ -213,6 +260,7 @@ esp32-crt-signal-core/
 │   ├── crt_diag/                           # Runtime telemetry
 │   ├── crt_fb/                             # Indexed-8 framebuffer + scanline hook
 │   ├── crt_compose/                        # Layer compositor
+│   ├── crt_stimulus/                       # Measurement stimulus patterns
 │   └── crt_tile/                           # Tilemap renderer
 ├── tests/                                  # Host-compiled C tests
 │   ├── burst_waveform_test.c
@@ -223,6 +271,7 @@ esp32-crt-signal-core/
 │   ├── crt_fb_test.c
 │   ├── crt_compose_test.c
 │   ├── crt_tile_test.c
+│   ├── crt_stimulus_test.c
 │   └── line_policy_test.c
 ├── tools/
 │   ├── img2fb.py                           # Image-to-framebuffer helper
@@ -271,7 +320,7 @@ Configure these with `idf.py menuconfig`:
 |:--------------------------------------|:----------------------------------------------|
 | `CRT_VIDEO_STANDARD`                  | Selects NTSC or PAL timing                    |
 | `CRT_ENABLE_COLOR`                    | Enables chroma burst and color demo output    |
-| `CRT_RENDER_MODE`                     | Selects compositor demo or direct RGB332 FB   |
+| `CRT_RENDER_MODE`                     | Selects compositor, RGB332 FB, or stimulus    |
 | `CRT_ENABLE_UART_UPLOAD`              | Enables experimental UART0 framebuffer upload |
 | `CRT_TEST_STANDARD_TOGGLE`            | Alternates NTSC/PAL at runtime for testing    |
 | `CRT_TEST_STANDARD_TOGGLE_INTERVAL_S` | Seconds between standard switches             |
@@ -281,6 +330,11 @@ using ESP_8_BIT-derived composite color lookup tables. The default remains
 `CRT_RENDER_MODE_COMPOSE`, which exercises the tile/compositor pipeline. PAL
 timing and sync remain owned by this project; ESP_8_BIT_composite is used only
 as a reference for proven RGB332 DAC tables and APLL coefficients.
+
+`CRT_RENDER_MODE_STIMULUS` runs `crt_stimulus` through `crt_compose` as a
+measurement layer. It emits deterministic ramps, checkerboards, PRBS, impulse,
+chirp, and frame-marker patterns intended for CRT/capture-card calibration and
+future physical reservoir experiments.
 
 ### Running Tests (Host)
 
@@ -318,4 +372,3 @@ make test-render
 <img src="assets/readme-footer.svg" alt="Built with phosphor persistence and scanline discipline." width="100%"/>
 
 </div>
-

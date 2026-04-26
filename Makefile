@@ -36,13 +36,14 @@ TEST_INC    := -I tests/stubs \
                -I components/crt_demo/include \
                -I components/crt_fb/include \
                -I components/crt_compose/include \
+               -I components/crt_stimulus/include \
                -I components/crt_tile/include \
                -I components/crt_hal/include
 TEST_OUT    := /tmp
 
 .PHONY: test test-core test-render test-burst test-policy test-timing test-demo test-hal-clock \
         test-composite-palette test-scanline-abi test-scanline-header test-fb test-compose \
-        test-tile
+        test-stimulus test-tile
 
 test: test-core test-render  ## Run all host tests
 	@echo "\n✓ All tests passed"
@@ -50,7 +51,7 @@ test: test-core test-render  ## Run all host tests
 test-core: test-burst test-policy test-timing test-demo test-hal-clock test-composite-palette test-scanline-abi test-scanline-header  ## Run core host tests
 	@echo "\n✓ Core tests passed"
 
-test-render: test-fb test-compose test-tile  ## Run render adapter host tests
+test-render: test-fb test-compose test-stimulus test-tile  ## Run render adapter host tests
 	@echo "\n✓ Render tests passed"
 
 test-burst:
@@ -102,7 +103,13 @@ test-fb:
 test-compose:
 	@$(TEST_CC) $(TEST_CFLAGS) $(TEST_INC) \
 		tests/crt_compose_test.c components/crt_compose/crt_compose.c \
+		components/crt_compose/crt_compose_layers.c components/crt_compose/crt_sprite.c \
 		-o $(TEST_OUT)/crt_compose_test && $(TEST_OUT)/crt_compose_test
+
+test-stimulus:
+	@$(TEST_CC) $(TEST_CFLAGS) $(TEST_INC) \
+		tests/crt_stimulus_test.c components/crt_stimulus/crt_stimulus.c \
+		-o $(TEST_OUT)/crt_stimulus_test && $(TEST_OUT)/crt_stimulus_test
 
 test-tile:
 	@$(TEST_CC) $(TEST_CFLAGS) $(TEST_INC) \

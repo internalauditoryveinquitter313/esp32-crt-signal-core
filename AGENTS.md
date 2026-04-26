@@ -9,7 +9,7 @@ Shared repository instructions for coding agents. Codex reads this file directly
 - Output path: `I2S0 -> internal DAC -> GPIO25`
 - Realtime unit: scanline, not frame
 - Design center: signal-first core with optional framebuffer and hook-based rendering
-- Design reference: `docs/superpowers/specs/2026-04-02-esp32-crt-signal-core-design.md`
+- Research direction: `docs/research/tcbvn.md`
 
 ## Instruction Model
 
@@ -94,7 +94,14 @@ gcc -I components/crt_fb/include -I components/crt_core/include \
 gcc -I components/crt_compose/include -I components/crt_core/include \
     -I components/crt_timing/include -I tests/stubs \
     tests/crt_compose_test.c components/crt_compose/crt_compose.c \
+    components/crt_compose/crt_compose_layers.c components/crt_compose/crt_sprite.c \
     -o /tmp/crt_compose_test && /tmp/crt_compose_test
+
+gcc -I components/crt_stimulus/include -I components/crt_compose/include \
+    -I components/crt_core/include -I components/crt_timing/include \
+    -I tests/stubs tests/crt_stimulus_test.c \
+    components/crt_stimulus/crt_stimulus.c \
+    -o /tmp/crt_stimulus_test && /tmp/crt_stimulus_test
 
 gcc -I components/crt_tile/include -I components/crt_core/include \
     -I components/crt_timing/include -I tests/stubs \
@@ -116,6 +123,7 @@ python tools/img2fb.py <input_image> <output.h> <variable_name>
 - Changes under `components/crt_core/include/crt_scanline.h` or hook ABI: run `crt_scanline_abi_test` and `crt_scanline_header_test`
 - Changes under `components/crt_fb/`: run `crt_fb_test`
 - Changes under `components/crt_compose/`: run `crt_compose_test`
+- Changes under `components/crt_stimulus/`: run `crt_stimulus_test`
 - Changes under `components/crt_tile/`: run `crt_tile_test`
 - Changes under `main/`, `components/crt_hal/`, `components/crt_core/crt_core.c`, or Kconfig/build wiring: run `idf.py build`
 - Changes under `tools/crt_monitor/`: run `make` in `tools/crt_monitor`
@@ -131,12 +139,13 @@ python tools/img2fb.py <input_image> <output.h> <variable_name>
 - `components/crt_diag/`: telemetry counters and snapshots
 - `components/crt_fb/`: indexed-8 framebuffer surface, palette LUT, scanline hook, compose layer adapter
 - `components/crt_compose/`: per-scanline indexed-8 compositor, layer z-order + keyed transparency, palette LUT + I2S word-swap output
+- `components/crt_compose/crt_sprite.*`: atlas-backed OAM sprite layer with deterministic per-scanline cap
+- `components/crt_stimulus/`: deterministic measurement patterns for capture/reservoir experiments
 - `components/crt_tile/`: PPU-style tilemap backend (8x8 indexed-8 patterns + nametable + scroll), fast 256→768 expansion path, fused scanline hook for compose delegation
 - `tests/`: host-compiled assertion-based tests plus ESP-IDF stubs
 - `tools/crt_monitor/`: webcam-backed monitoring dashboard
 - `tools/img2fb.py`: image-to-framebuffer conversion helper
-- `docs/superpowers/specs/`: design specs
-- `docs/superpowers/plans/`: implementation plans
+- `docs/research/`: research direction and physical-computing notes
 
 ## Architecture Invariants
 
@@ -164,6 +173,7 @@ python tools/img2fb.py <input_image> <output.h> <variable_name>
 
 - `CRT_VIDEO_STANDARD`: selects NTSC or PAL timing
 - `CRT_ENABLE_COLOR`: enables chroma burst and color demo output
+- `CRT_RENDER_MODE`: selects compositor demo, direct RGB332 framebuffer, or measurement stimulus
 - `CRT_ENABLE_UART_UPLOAD`: enables experimental UART0 raw framebuffer upload
 - `CRT_TEST_STANDARD_TOGGLE`: auto-toggle NTSC/PAL at runtime
 - `CRT_TEST_STANDARD_TOGGLE_INTERVAL_S`: toggle interval in seconds
@@ -184,5 +194,5 @@ python tools/img2fb.py <input_image> <output.h> <variable_name>
 
 ## Related Docs
 
-- `README.md`: human-facing overview and usage
-- `docs/superpowers/specs/2026-04-02-esp32-crt-signal-core-design.md`: architecture intent and roadmap context
+- `.github/README.md`: human-facing overview and usage
+- `docs/research/tcbvn.md`: research direction for CRT reservoir and analog/vacuum neuromorphic exploration
