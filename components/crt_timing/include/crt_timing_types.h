@@ -21,7 +21,10 @@ typedef struct {
     crt_video_standard_t standard;
     uint32_t sample_rate_hz;
     uint16_t total_lines;
+    uint16_t active_start_line;
     uint16_t active_lines;
+    uint16_t vsync_start_line;
+    uint16_t vsync_line_count;
     uint16_t samples_per_line;
     uint16_t active_offset;
     uint16_t active_width;
