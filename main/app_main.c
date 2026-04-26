@@ -63,13 +63,13 @@ DRAM_ATTR static uint8_t s_sprite_atlas_data[64 * 16];
 static crt_sprite_atlas_t s_sprite_atlas;
 static crt_sprite_layer_t s_sprite_layer;
 enum {
-    APP_DEMO_SPRITE_COUNT = 4,
+    APP_DEMO_SPRITE_COUNT = 3,
 };
 static uint8_t s_sprite_ids[APP_DEMO_SPRITE_COUNT];
 
 static void demo_sprite_atlas_fill(void)
 {
-    static const uint8_t k_colors[APP_DEMO_SPRITE_COUNT] = {64U, 128U, 192U, 240U};
+    static const uint8_t k_colors[APP_DEMO_SPRITE_COUNT] = {64U, 160U, 240U};
     for (size_t s = 0; s < APP_DEMO_SPRITE_COUNT; ++s) {
         for (uint8_t y = 0; y < 16U; ++y) {
             uint8_t *row = &s_sprite_atlas_data[(size_t)y * 64U + (size_t)s * 16U];
@@ -110,8 +110,8 @@ IRAM_ATTR static void demo_frame_hook(uint32_t frame, void *user_data)
 
     /* Sprite world is logical 256x240 (before x_scale=3). Bounce inside
      * [0 .. 256-16] horizontally and [0 .. 240-16] vertically per sprite. */
-    static int16_t s_dx[APP_DEMO_SPRITE_COUNT] = {1, -1, 2, -2};
-    static int16_t s_dy[APP_DEMO_SPRITE_COUNT] = {1, 2, -1, -2};
+    static int16_t s_dx[APP_DEMO_SPRITE_COUNT] = {1, -1, 2};
+    static int16_t s_dy[APP_DEMO_SPRITE_COUNT] = {1, 2, -1};
     for (size_t i = 0; i < APP_DEMO_SPRITE_COUNT; ++i) {
         if (s_sprite_ids[i] == CRT_SPRITE_INVALID_ID) {
             continue;
