@@ -1,63 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="210" viewBox="0 0 1200 210" role="img" aria-labelledby="title desc">
   <title id="title">CRT Signal Core</title>
   <desc id="desc">Flat retro CRT signal banner for an ESP32 composite video engine.</desc>
   <defs>
     <style>
       :root {
-        --bg: #fff8f0;
+        --panel: #fff8f0;
         --ink: #201827;
         --muted: #6f5674;
-        --panel: #ffffff;
         --cyan: #007f91;
         --pink: #cf1b7f;
-        --purple: #6d3fc2;
         --amber: #c46f00;
         --rule: #ead6e7;
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg: #090613;
+          --panel: #11101a;
           --ink: #fff4df;
           --muted: #d7b7d7;
-          --panel: #151020;
           --cyan: #26d8e8;
           --pink: #ff4aa2;
-          --purple: #9d7cff;
           --amber: #ffd15a;
-          --rule: #352540;
+          --rule: #392944;
         }
       }
 
       .eyebrow { font: 700 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--muted); letter-spacing: 0; }
-      .title { font: 900 62px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--ink); letter-spacing: 0; }
-      .subtitle { font: 700 19px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--cyan); letter-spacing: 0; }
+      .title { font: 900 60px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--ink); letter-spacing: 0; }
+      .subtitle { font: 700 18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--cyan); letter-spacing: 0; }
       .note { font: 700 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--muted); letter-spacing: 0; }
     </style>
   </defs>
 
-  <rect width="1200" height="240" rx="18" fill="var(--bg)"/>
-  <rect x="28" y="28" width="1144" height="184" rx="12" fill="var(--panel)" stroke="var(--rule)" stroke-width="2"/>
-  <rect x="28" y="28" width="10" height="184" fill="var(--pink)"/>
-  <rect x="38" y="28" width="10" height="184" fill="var(--cyan)"/>
-  <rect x="48" y="28" width="10" height="184" fill="var(--amber)"/>
+  <rect x="18" y="18" width="1164" height="174" rx="14" fill="var(--panel)" stroke="var(--rule)" stroke-width="2"/>
+  <rect x="42" y="42" width="8" height="126" fill="var(--pink)"/>
+  <rect x="54" y="42" width="8" height="126" fill="var(--cyan)"/>
+  <rect x="66" y="42" width="8" height="126" fill="var(--amber)"/>
 
-  <g transform="translate(96 66)">
+  <g transform="translate(108 62)">
     <text class="eyebrow" x="0" y="0">ESP32-D0WD-V3 / I2S0 -> DAC0 -> GPIO25</text>
-    <text class="title" x="0" y="70">CRT Signal Core</text>
-    <text class="subtitle" x="2" y="108">Deterministic Composite Video Engine</text>
-    <text class="note" x="2" y="146">scanline-first / no allocations after start / sync before richness</text>
+    <text class="title" x="0" y="62">CRT Signal Core</text>
+    <text class="subtitle" x="2" y="98">Deterministic Composite Video Engine</text>
   </g>
 
-  <g transform="translate(760 66)">
-    <rect x="0" y="0" width="314" height="108" rx="8" fill="none" stroke="var(--rule)" stroke-width="2"/>
-    <path d="M24 56h58v-28h26v28h48l16-40 18 82 18-42h42l18-28 20 28" fill="none" stroke="var(--cyan)" stroke-width="5" stroke-linecap="square" stroke-linejoin="round"/>
-    <path d="M24 84h38v-16h26v16h38v-16h26v16h38v-16h26v16h38" fill="none" stroke="var(--pink)" stroke-width="4" stroke-linecap="square"/>
-    <text class="note" x="22" y="128">63.5us line budget</text>
+  <g transform="translate(760 62)">
+    <path d="M0 57h58v-28h26v28h48l16-40 18 82 18-42h42l18-28 20 28" fill="none" stroke="var(--cyan)" stroke-width="5" stroke-linecap="square" stroke-linejoin="round"/>
+    <path d="M0 86h38v-16h26v16h38v-16h26v16h38v-16h26v16h38" fill="none" stroke="var(--pink)" stroke-width="4" stroke-linecap="square"/>
+    <text class="note" x="0" y="122">63.5us line budget</text>
   </g>
 
-  <path d="M96 194h978" stroke="var(--rule)" stroke-width="2"/>
-  <circle cx="1096" cy="194" r="5" fill="var(--pink)"/>
-  <circle cx="1118" cy="194" r="5" fill="var(--cyan)"/>
-  <circle cx="1140" cy="194" r="5" fill="var(--amber)"/>
+  <circle cx="1110" cy="158" r="5" fill="var(--pink)"/>
+  <circle cx="1132" cy="158" r="5" fill="var(--cyan)"/>
+  <circle cx="1154" cy="158" r="5" fill="var(--amber)"/>
 </svg>
