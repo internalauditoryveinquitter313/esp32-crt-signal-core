@@ -185,7 +185,7 @@ static void app_fill_rgb332_test_card(crt_fb_surface_t *fb)
 
 /* ── Optional serial upload protocol ─────────────────────────────── */
 #if CONFIG_CRT_ENABLE_UART_UPLOAD
-#define UPLOAD_MAGIC    {0xFB, 0xDA, 0x00, 0x01}
+static const uint8_t k_upload_magic[4] = {0xFB, 0xDA, 0x00, 0x01};
 #define UPLOAD_ACK      0x06
 #define UPLOAD_NAK      0x15
 #define UPLOAD_UART_NUM UART_NUM_0
@@ -212,7 +212,7 @@ static esp_err_t uart_upload_init(void)
 static void uart_upload_check(crt_fb_surface_t *fb)
 {
     uint8_t byte;
-    static const uint8_t magic[] = UPLOAD_MAGIC;
+    const uint8_t *magic = k_upload_magic;
 
     if (s_uart_fd < 0)
         return;
@@ -285,7 +285,7 @@ static esp_err_t app_start_core(crt_video_standard_t video_standard)
         .demo_pattern_mode = (k_enable_color || k_use_rgb332_framebuffer)
                                  ? CRT_DEMO_PATTERN_COLOR_BARS_RAMP
                                  : CRT_DEMO_PATTERN_LUMA_BARS,
-        .target_ready_depth = 48,
+        .target_ready_depth = 64,
         .min_ready_depth = 0,
         .prep_task_core = 1,
     };
@@ -329,7 +329,7 @@ static esp_err_t app_start_core(crt_video_standard_t video_standard)
         crt_stimulus_config_t stimulus_config;
         crt_stimulus_default_config(&stimulus_config);
         stimulus_config.height = APP_FB_HEIGHT;
-        stimulus_config.pattern = CRT_STIMULUS_PATTERN_HORIZONTAL_RAMP;
+        stimulus_config.pattern = CRT_STIMULUS_PATTERN_VERTICAL_RAMP;
         stimulus_config.cell_w = 16;
         stimulus_config.cell_h = 8;
 
