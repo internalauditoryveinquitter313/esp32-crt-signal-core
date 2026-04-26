@@ -1,5 +1,7 @@
 #include "crt_hal.h"
 
+#include "crt_hal_clock.h"
+
 #include "driver/rtc_io.h"
 #include "esp_attr.h"
 #include "esp_check.h"
@@ -56,11 +58,12 @@ static uint32_t crt_hal_set_apll_freq(uint32_t mclk_hz)
 {
     uint32_t real_freq = 0;
     uint32_t o_div, sdm0, sdm1, sdm2;
+    crt_hal_apll_coeff_t coeffs;
 
     /*
      * Use rtc_clk_apll_coeff_calc for the target, then log and compare.
-     * ESP_8_BIT reference: o_div=1, sdm0=0x46, sdm1=0x97, sdm2=0x4
-     * producing f_apll = 57,272,727 Hz → sample rate 14,318,182 Hz.
+     * ESP_8_BIT's proven coefficients are then selected by target
+     * sample rate so PAL does not accidentally run on the NTSC APLL.
      */
     real_freq = rtc_clk_apll_coeff_calc(mclk_hz, &o_div, &sdm0, &sdm1, &sdm2);
     ESP_LOGI(TAG,
@@ -68,15 +71,18 @@ static uint32_t crt_hal_set_apll_freq(uint32_t mclk_hz)
              " sdm=[%02x,%02x,%02x]",
              mclk_hz, real_freq, o_div, (unsigned)sdm0, (unsigned)sdm1, (unsigned)sdm2);
 
-    /* Override with ESP_8_BIT's proven exact parameters */
-    o_div = 1;
-    sdm0 = 0x46;
-    sdm1 = 0x97;
-    sdm2 = 0x04;
-    rtc_clk_apll_coeff_set(o_div, sdm0, sdm1, sdm2);
-    real_freq = 57272727;
-    ESP_LOGI(TAG, "APLL override with ESP_8_BIT coeffs: 57272727 Hz");
-    return real_freq;
+    if (!crt_hal_apll_coeffs_for_sample_rate(mclk_hz, &coeffs)) {
+        ESP_LOGE(TAG, "unsupported APLL sample rate: %" PRIu32, mclk_hz);
+        return 0;
+    }
+
+    rtc_clk_apll_coeff_set(coeffs.o_div, coeffs.sdm0, coeffs.sdm1, coeffs.sdm2);
+    ESP_LOGI(TAG,
+             "APLL override: %s sample=%" PRIu32 " apll=%" PRIu32 " o_div=%" PRIu32
+             " sdm=[%02x,%02x,%02x]",
+             coeffs.name, coeffs.sample_rate_hz, coeffs.apll_hz, coeffs.o_div,
+             (unsigned)coeffs.sdm0, (unsigned)coeffs.sdm1, (unsigned)coeffs.sdm2);
+    return coeffs.apll_hz;
 }
 
 static esp_err_t crt_hal_configure_clock(uint32_t sample_rate_hz, bool use_apll)
@@ -105,13 +111,14 @@ static esp_err_t crt_hal_configure_clock(uint32_t sample_rate_hz, bool use_apll)
     }
 }
 
-static int IRAM_ATTR crt_hal_find_desc_index(uint32_t desc_addr) {
+static int IRAM_ATTR crt_hal_find_desc_index(uint32_t desc_addr)
+{
     if (s_hal.descs == NULL || s_hal.config.dma_line_count == 0) {
         return -1;
     }
 
-    const uintptr_t base = (uintptr_t) s_hal.descs;
-    const uintptr_t addr = (uintptr_t) desc_addr;
+    const uintptr_t base = (uintptr_t)s_hal.descs;
+    const uintptr_t addr = (uintptr_t)desc_addr;
     const uintptr_t desc_size = sizeof(s_hal.descs[0]);
 
     if (addr < base) {
@@ -124,7 +131,7 @@ static int IRAM_ATTR crt_hal_find_desc_index(uint32_t desc_addr) {
     }
 
     const size_t desc_index = offset / desc_size;
-    return (desc_index < s_hal.config.dma_line_count) ? (int) desc_index : -1;
+    return (desc_index < s_hal.config.dma_line_count) ? (int)desc_index : -1;
 }
 
 static void IRAM_ATTR crt_hal_isr(void *arg)
@@ -181,18 +188,18 @@ static esp_err_t crt_hal_alloc_dma_resources(void)
     size_t buffer_bytes = s_hal.config.dma_samples_per_line * sizeof(uint16_t);
 
     s_hal.descs =
-            heap_caps_calloc(s_hal.config.dma_line_count, sizeof(lldesc_t), CRT_HAL_DESC_ALLOC_CAPS);
+        heap_caps_calloc(s_hal.config.dma_line_count, sizeof(lldesc_t), CRT_HAL_DESC_ALLOC_CAPS);
     ESP_RETURN_ON_FALSE(s_hal.descs != NULL, ESP_ERR_NO_MEM, TAG, "failed to allocate descriptors");
 
     s_hal.line_buffers =
-            heap_caps_calloc(s_hal.config.dma_line_count, sizeof(uint16_t *), CRT_HAL_DESC_ALLOC_CAPS);
+        heap_caps_calloc(s_hal.config.dma_line_count, sizeof(uint16_t *), CRT_HAL_DESC_ALLOC_CAPS);
     ESP_RETURN_ON_FALSE(s_hal.line_buffers != NULL, ESP_ERR_NO_MEM, TAG,
                         "failed to allocate buffer list");
 
     for (size_t i = 0; i < s_hal.config.dma_line_count; ++i) {
         s_hal.line_buffers[i] = heap_caps_calloc(1, buffer_bytes, CRT_HAL_DESC_ALLOC_CAPS);
         if (s_hal.line_buffers[i] == NULL) {
-            ESP_LOGE(TAG, "failed to allocate line buffer %u", (unsigned) i);
+            ESP_LOGE(TAG, "failed to allocate line buffer %u", (unsigned)i);
             crt_hal_free_dma_resources();
             return ESP_ERR_NO_MEM;
         }
