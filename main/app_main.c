@@ -132,6 +132,36 @@ IRAM_ATTR static void demo_frame_hook(uint32_t frame, void *user_data)
     }
 }
 
+/* Direct stimulus scanline hook (fused fetch+palette+swap).
+ * Skips compose entirely — single-layer measurement mode never benefits
+ * from compose's mixing logic, so we bypass the 2-pass overhead. */
+IRAM_ATTR static void stimulus_scanline_hook(const crt_scanline_t *scanline, uint16_t *active_buf,
+                                             uint16_t active_width, void *user_data)
+{
+    crt_stimulus_t *st = (crt_stimulus_t *)user_data;
+    if (st == NULL || active_buf == NULL || active_width == 0 ||
+        active_width > CRT_COMPOSE_MAX_WIDTH || s_fb.palette == NULL ||
+        !CRT_SCANLINE_HAS_LOGICAL(scanline)) {
+        return;
+    }
+    static DRAM_ATTR uint8_t line_buf[CRT_COMPOSE_MAX_WIDTH];
+    if (!crt_stimulus_layer_fetch(st, scanline->logical_line, line_buf, active_width)) {
+        return;
+    }
+    const uint16_t *pal = s_fb.palette;
+    const uint16_t even = active_width & (uint16_t)~1U;
+    uint16_t i = 0;
+    for (; i < even; i += 2) {
+        uint16_t p0 = pal[line_buf[i]];
+        uint16_t p1 = pal[line_buf[i + 1]];
+        active_buf[i] = p1;
+        active_buf[i + 1] = p0;
+    }
+    if (i < active_width) {
+        active_buf[i] = pal[line_buf[i]];
+    }
+}
+
 IRAM_ATTR static void stimulus_frame_hook(uint32_t frame, void *user_data)
 {
     (void)user_data;
@@ -299,7 +329,7 @@ static esp_err_t app_start_core(crt_video_standard_t video_standard)
         crt_stimulus_config_t stimulus_config;
         crt_stimulus_default_config(&stimulus_config);
         stimulus_config.height = APP_FB_HEIGHT;
-        stimulus_config.pattern = CRT_STIMULUS_PATTERN_FRAME_MARKERS;
+        stimulus_config.pattern = CRT_STIMULUS_PATTERN_HORIZONTAL_RAMP;
         stimulus_config.cell_w = 16;
         stimulus_config.cell_h = 8;
 
@@ -309,13 +339,10 @@ static esp_err_t app_start_core(crt_video_standard_t video_standard)
             return stimulus_err;
         }
 
-        crt_compose_init(&s_compose);
-        crt_compose_set_palette(&s_compose, s_fb.palette, s_fb.palette_size);
-        crt_compose_add_layer(&s_compose, crt_stimulus_layer_fetch, &s_stimulus,
-                              CRT_COMPOSE_NO_TRANSPARENCY);
-        crt_register_scanline_hook(crt_compose_scanline_hook, &s_compose);
+        crt_register_scanline_hook(stimulus_scanline_hook, &s_stimulus);
         crt_register_frame_hook(stimulus_frame_hook, NULL);
-        ESP_LOGI(TAG, "render: measurement stimulus compositor %ux%u", APP_FB_WIDTH, APP_FB_HEIGHT);
+        ESP_LOGI(TAG, "render: measurement stimulus (direct hook) %ux%u", APP_FB_WIDTH,
+                 APP_FB_HEIGHT);
     } else {
         /* ── Tile layer as fused base + keyed overlay on top ──────────── */
 

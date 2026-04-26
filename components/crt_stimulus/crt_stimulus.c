@@ -92,8 +92,11 @@ void crt_stimulus_advance_frame(crt_stimulus_t *stimulus)
 static void fill_horizontal_ramp(uint8_t *idx_out, uint16_t width)
 {
     const uint32_t max_x = (uint32_t)width - 1U;
+    /* Hoist the divide: compute the 255/max_x multiplier once, then
+     * multiply per pixel. Eliminates 768 divides per scanline. */
+    const uint32_t mult_x = max_x == 0U ? 0U : ((255U << 16) + max_x / 2U) / max_x;
     for (uint16_t x = 0; x < width; ++x) {
-        idx_out[x] = scale_u8(x, max_x);
+        idx_out[x] = (uint8_t)(((uint32_t)x * mult_x) >> 16);
     }
 }
 
@@ -187,8 +190,13 @@ IRAM_ATTR static void fill_frame_markers(const crt_stimulus_t *stimulus, uint16_
 
     const uint32_t max_x = (uint32_t)width - 1U;
     const uint32_t max_y = (uint32_t)stimulus->config.height - 1U;
+    /* Same hoist: precompute Q16 multipliers + the constant Y term once. */
+    const uint32_t mult_x = max_x == 0U ? 0U : ((255U << 16) + max_x / 2U) / max_x;
+    const uint32_t mult_y = max_y == 0U ? 0U : ((255U << 16) + max_y / 2U) / max_y;
+    const uint32_t y_term = ((uint32_t)logical_line * mult_y) >> 16;
     for (uint16_t x = 0; x < width; ++x) {
-        idx_out[x] = (uint8_t)((scale_u8(x, max_x) + scale_u8(logical_line, max_y)) >> 1);
+        const uint32_t x_term = ((uint32_t)x * mult_x) >> 16;
+        idx_out[x] = (uint8_t)((x_term + y_term) >> 1);
     }
 }
 
