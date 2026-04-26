@@ -10,14 +10,14 @@ static const uint16_t k_luma_bar_levels[8] = {
     14643U, /* cyan    70% */
     13348U, /* green   59% */
     11228U, /* magenta 41% */
-     9933U, /* red     30% */
-     7695U, /* blue    11% */
-     6400U, /* black    0% */
+    9933U,  /* red     30% */
+    7695U,  /* blue    11% */
+    6400U,  /* black    0% */
 };
 
-#define CRT_DEMO_COLOR_BAR_COUNT      8U
-#define CRT_DEMO_SAMPLES_PER_QUAD     12U
-#define CRT_DEMO_LOGICAL_QUAD_WIDTH   4U
+#define CRT_DEMO_COLOR_BAR_COUNT    8U
+#define CRT_DEMO_SAMPLES_PER_QUAD   12U
+#define CRT_DEMO_LOGICAL_QUAD_WIDTH 4U
 
 static const uint32_t k_demo_ntsc_bar_patterns[CRT_DEMO_COLOR_BAR_COUNT] = {
     0x49494949U, /* white */
@@ -90,8 +90,7 @@ static void crt_demo_pattern_encode_legacy_quad(const uint32_t *packed_colors, u
 
 static void crt_demo_pattern_render_color_bars(const crt_demo_pattern_runtime_t *runtime,
                                                const crt_demo_pattern_render_context_t *ctx,
-                                               uint16_t *samples,
-                                               size_t sample_count)
+                                               uint16_t *samples, size_t sample_count)
 {
     const uint32_t *palette = k_demo_ntsc_bar_patterns;
     uint32_t packed_colors[CRT_DEMO_LOGICAL_QUAD_WIDTH];
@@ -101,11 +100,11 @@ static void crt_demo_pattern_render_color_bars(const crt_demo_pattern_runtime_t 
     }
 
     if (ctx->video_standard == CRT_VIDEO_STANDARD_PAL) {
-        palette = ((ctx->line_index & 0x1U) == 0U) ? k_demo_pal_bar_patterns_even : k_demo_pal_bar_patterns_odd;
+        palette = ((ctx->line_index & 0x1U) == 0U) ? k_demo_pal_bar_patterns_even
+                                                   : k_demo_pal_bar_patterns_odd;
     }
 
-    for (size_t pixel_index = 0, sample_index = 0;
-         pixel_index < CRT_DEMO_PATTERN_LOGICAL_WIDTH;
+    for (size_t pixel_index = 0, sample_index = 0; pixel_index < CRT_DEMO_PATTERN_LOGICAL_WIDTH;
          pixel_index += CRT_DEMO_LOGICAL_QUAD_WIDTH, sample_index += CRT_DEMO_SAMPLES_PER_QUAD) {
         for (size_t i = 0; i < CRT_DEMO_LOGICAL_QUAD_WIDTH; ++i) {
             packed_colors[i] = palette[runtime->color_bars_row[pixel_index + i] & 0x7U];
@@ -115,24 +114,29 @@ static void crt_demo_pattern_render_color_bars(const crt_demo_pattern_runtime_t 
 }
 
 static void crt_demo_pattern_render_luma_bars(const crt_demo_pattern_runtime_t *runtime,
-                                              uint16_t *samples,
-                                              size_t sample_count)
+                                              uint16_t *samples, size_t sample_count)
 {
     for (size_t i = 0; i < sample_count; ++i) {
         const size_t pixel_index = (i * CRT_DEMO_PATTERN_LOGICAL_WIDTH) / sample_count;
-        const uint8_t bar_index = runtime->color_bars_row[
-            pixel_index < CRT_DEMO_PATTERN_LOGICAL_WIDTH ? pixel_index : (CRT_DEMO_PATTERN_LOGICAL_WIDTH - 1U)];
+        const uint8_t bar_index =
+            runtime->color_bars_row[pixel_index < CRT_DEMO_PATTERN_LOGICAL_WIDTH
+                                        ? pixel_index
+                                        : (CRT_DEMO_PATTERN_LOGICAL_WIDTH - 1U)];
         samples[i] = k_luma_bar_levels[bar_index & 0x7U];
     }
 }
 
-static uint8_t crt_demo_pixel_for_sample(size_t sample_index, size_t sample_count, const uint8_t *row)
+static uint8_t crt_demo_pixel_for_sample(size_t sample_index, size_t sample_count,
+                                         const uint8_t *row)
 {
     const size_t pixel_index = (sample_index * CRT_DEMO_PATTERN_LOGICAL_WIDTH) / sample_count;
-    return row[pixel_index < CRT_DEMO_PATTERN_LOGICAL_WIDTH ? pixel_index : (CRT_DEMO_PATTERN_LOGICAL_WIDTH - 1U)];
+    return row[pixel_index < CRT_DEMO_PATTERN_LOGICAL_WIDTH
+                   ? pixel_index
+                   : (CRT_DEMO_PATTERN_LOGICAL_WIDTH - 1U)];
 }
 
-static bool crt_demo_marker_pixel_for_standard(crt_video_standard_t standard, uint16_t active_line_index, size_t pixel_index)
+static bool crt_demo_marker_pixel_for_standard(crt_video_standard_t standard,
+                                               uint16_t active_line_index, size_t pixel_index)
 {
     static const uint8_t k_glyph_n[7] = {
         0x11U, 0x19U, 0x15U, 0x13U, 0x11U, 0x11U, 0x11U,
@@ -176,18 +180,19 @@ void crt_demo_pattern_build_grayscale_ramp_row(uint8_t *pixels, size_t width)
     }
 }
 
-bool crt_demo_pattern_is_ramp_region(const crt_demo_pattern_runtime_t *runtime, uint16_t active_line_index)
+bool crt_demo_pattern_is_ramp_region(const crt_demo_pattern_runtime_t *runtime,
+                                     uint16_t active_line_index)
 {
-    const uint16_t ramp_start = (runtime->active_line_count > runtime->ramp_height_lines)
-                                    ? (uint16_t)(runtime->active_line_count - runtime->ramp_height_lines)
-                                    : (uint16_t)0U;
+    const uint16_t ramp_start =
+        (runtime->active_line_count > runtime->ramp_height_lines)
+            ? (uint16_t)(runtime->active_line_count - runtime->ramp_height_lines)
+            : (uint16_t)0U;
 
     return active_line_index >= ramp_start;
 }
 
 void crt_demo_pattern_runtime_init(crt_demo_pattern_runtime_t *runtime,
-                                   crt_demo_pattern_mode_t mode,
-                                   uint16_t active_line_count)
+                                   crt_demo_pattern_mode_t mode, uint16_t active_line_count)
 {
     const size_t safe_margin = CRT_DEMO_PATTERN_LOGICAL_WIDTH / 10U; /* ~10% each side */
 
@@ -196,7 +201,8 @@ void crt_demo_pattern_runtime_init(crt_demo_pattern_runtime_t *runtime,
     runtime->ramp_height_lines = CRT_DEMO_RAMP_HEIGHT_LINES;
 
     crt_demo_pattern_build_color_bars_row(runtime->color_bars_row, CRT_DEMO_PATTERN_LOGICAL_WIDTH);
-    crt_demo_pattern_build_grayscale_ramp_row(runtime->grayscale_ramp_row, CRT_DEMO_PATTERN_LOGICAL_WIDTH);
+    crt_demo_pattern_build_grayscale_ramp_row(runtime->grayscale_ramp_row,
+                                              CRT_DEMO_PATTERN_LOGICAL_WIDTH);
 
     /* Apply safe area margins — set edges to black so all 8 bars fit within
        the ~80% center of the active window, avoiding CRT overscan cutoff. */
@@ -210,12 +216,11 @@ void crt_demo_pattern_runtime_init(crt_demo_pattern_runtime_t *runtime,
 
 void crt_demo_pattern_render_active_window(const crt_demo_pattern_runtime_t *runtime,
                                            const crt_demo_pattern_render_context_t *ctx,
-                                           uint16_t blank_level,
-                                           uint16_t *samples,
+                                           uint16_t blank_level, uint16_t *samples,
                                            size_t sample_count)
 {
-    const bool ramp_region =
-        (runtime->mode != CRT_DEMO_PATTERN_DISABLED) && crt_demo_pattern_is_ramp_region(runtime, ctx->active_line_index);
+    const bool ramp_region = (runtime->mode != CRT_DEMO_PATTERN_DISABLED) &&
+                             crt_demo_pattern_is_ramp_region(runtime, ctx->active_line_index);
 
     (void)blank_level;
 
@@ -226,9 +231,11 @@ void crt_demo_pattern_render_active_window(const crt_demo_pattern_runtime_t *run
     if (runtime->mode == CRT_DEMO_PATTERN_LUMA_BARS) {
         if (ramp_region) {
             for (size_t i = 0; i < sample_count; ++i) {
-                const uint8_t pixel = crt_demo_pixel_for_sample(i, sample_count, runtime->grayscale_ramp_row);
-                const uint32_t level = CRT_DEMO_LUMA_BLACK +
-                                       (((uint32_t)(CRT_DEMO_LUMA_WHITE - CRT_DEMO_LUMA_BLACK) * pixel) / 255U);
+                const uint8_t pixel =
+                    crt_demo_pixel_for_sample(i, sample_count, runtime->grayscale_ramp_row);
+                const uint32_t level =
+                    CRT_DEMO_LUMA_BLACK +
+                    (((uint32_t)(CRT_DEMO_LUMA_WHITE - CRT_DEMO_LUMA_BLACK) * pixel) / 255U);
                 samples[i] = (uint16_t)level;
             }
         } else {
@@ -237,10 +244,12 @@ void crt_demo_pattern_render_active_window(const crt_demo_pattern_runtime_t *run
     } else {
         if (ramp_region) {
             for (size_t i = 0; i < sample_count; ++i) {
-                const uint8_t pixel = crt_demo_pixel_for_sample(i, sample_count, runtime->grayscale_ramp_row);
-                const uint32_t level = CRT_DEMO_LUMA_BLACK +
-                                       (((uint32_t)(CRT_DEMO_LUMA_WHITE - CRT_DEMO_LUMA_BLACK) * pixel) / 255U);
-                samples[i] = (uint16_t) level;
+                const uint8_t pixel =
+                    crt_demo_pixel_for_sample(i, sample_count, runtime->grayscale_ramp_row);
+                const uint32_t level =
+                    CRT_DEMO_LUMA_BLACK +
+                    (((uint32_t)(CRT_DEMO_LUMA_WHITE - CRT_DEMO_LUMA_BLACK) * pixel) / 255U);
+                samples[i] = (uint16_t)level;
             }
         } else {
             crt_demo_pattern_render_color_bars(runtime, ctx, samples, sample_count);
@@ -249,7 +258,8 @@ void crt_demo_pattern_render_active_window(const crt_demo_pattern_runtime_t *run
 
     for (size_t i = 0; i < sample_count; ++i) {
         const size_t pixel_index = (i * CRT_DEMO_PATTERN_LOGICAL_WIDTH) / sample_count;
-        if (crt_demo_marker_pixel_for_standard(ctx->video_standard, ctx->active_line_index, pixel_index)) {
+        if (crt_demo_marker_pixel_for_standard(ctx->video_standard, ctx->active_line_index,
+                                               pixel_index)) {
             samples[i] = CRT_DEMO_LUMA_WHITE;
         }
     }

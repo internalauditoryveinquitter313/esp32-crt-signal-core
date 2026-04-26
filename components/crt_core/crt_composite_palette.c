@@ -566,81 +566,75 @@ static const DRAM_ATTR uint32_t k_pal_yuyv[CRT_COMPOSITE_RGB332_WIDTH * 2U] = {
     0x49494949U,
 };
 
-static const uint32_t *crt_composite_rgb332_table(crt_video_standard_t standard,
-                                                  uint16_t line_index)
+IRAM_ATTR static const uint32_t *crt_composite_rgb332_table(crt_video_standard_t standard,
+                                                            uint16_t line_index)
 {
     if (standard == CRT_VIDEO_STANDARD_PAL) {
-        return ((line_index & 0x1U) == 0U) ? &k_pal_yuyv[CRT_COMPOSITE_RGB332_WIDTH]
-                                           : k_pal_yuyv;
+        return ((line_index & 0x1U) == 0U) ? &k_pal_yuyv[CRT_COMPOSITE_RGB332_WIDTH] : k_pal_yuyv;
     }
 
     return k_ntsc_rgb332;
 }
 
-static uint16_t crt_composite_sample_p0(uint32_t packed)
-{
-    return (uint16_t)((packed << 8) & 0xFF00U);
-}
+/* Encode one packed RGB332 quad (4 source pixels) into 12 DAC samples
+ * directly, without per-quad function calls or per-sample byte-shift
+ * helpers. Unrolled so the compiler can issue paired loads/stores into
+ * the I2S word-swap stream. */
+#define CRT_COMPOSITE_QUAD_FROM_TABLE(table, src_quad, dst_quad) \
+    do {                                                         \
+        const uint32_t _c0 = (table)[(src_quad)[0]];             \
+        const uint32_t _c1 = (table)[(src_quad)[1]];             \
+        const uint32_t _c2 = (table)[(src_quad)[2]];             \
+        const uint32_t _c3 = (table)[(src_quad)[3]];             \
+        (dst_quad)[0] = (uint16_t)((_c0 << 8) & 0xFF00U);        \
+        (dst_quad)[1] = (uint16_t)(_c0 & 0xFF00U);               \
+        (dst_quad)[2] = (uint16_t)((_c0 >> 8) & 0xFF00U);        \
+        (dst_quad)[3] = (uint16_t)((_c1 >> 16) & 0xFF00U);       \
+        (dst_quad)[4] = (uint16_t)((_c1 << 8) & 0xFF00U);        \
+        (dst_quad)[5] = (uint16_t)(_c1 & 0xFF00U);               \
+        (dst_quad)[6] = (uint16_t)((_c2 >> 8) & 0xFF00U);        \
+        (dst_quad)[7] = (uint16_t)((_c2 >> 16) & 0xFF00U);       \
+        (dst_quad)[8] = (uint16_t)((_c2 << 8) & 0xFF00U);        \
+        (dst_quad)[9] = (uint16_t)(_c3 & 0xFF00U);               \
+        (dst_quad)[10] = (uint16_t)((_c3 >> 8) & 0xFF00U);       \
+        (dst_quad)[11] = (uint16_t)((_c3 >> 16) & 0xFF00U);      \
+    } while (0)
 
-static uint16_t crt_composite_sample_p1(uint32_t packed)
-{
-    return (uint16_t)(packed & 0xFF00U);
-}
-
-static uint16_t crt_composite_sample_p2(uint32_t packed)
-{
-    return (uint16_t)((packed >> 8) & 0xFF00U);
-}
-
-static uint16_t crt_composite_sample_p3(uint32_t packed)
-{
-    return (uint16_t)((packed >> 16) & 0xFF00U);
-}
-
-uint32_t crt_composite_rgb332_packed(crt_video_standard_t standard, uint16_t line_index,
-                                     uint8_t rgb332)
+IRAM_ATTR uint32_t crt_composite_rgb332_packed(crt_video_standard_t standard, uint16_t line_index,
+                                               uint8_t rgb332)
 {
     return crt_composite_rgb332_table(standard, line_index)[rgb332];
 }
 
-void crt_composite_rgb332_encode_quad(crt_video_standard_t standard, uint16_t line_index,
-                                      const uint8_t rgb332[4],
-                                      uint16_t dst[CRT_COMPOSITE_RGB332_SAMPLES_PER_4])
+IRAM_ATTR void crt_composite_rgb332_encode_quad(crt_video_standard_t standard, uint16_t line_index,
+                                                const uint8_t rgb332[4],
+                                                uint16_t dst[CRT_COMPOSITE_RGB332_SAMPLES_PER_4])
 {
     if (rgb332 == NULL || dst == NULL) {
         return;
     }
-
     const uint32_t *table = crt_composite_rgb332_table(standard, line_index);
-    const uint32_t c0 = table[rgb332[0]];
-    const uint32_t c1 = table[rgb332[1]];
-    const uint32_t c2 = table[rgb332[2]];
-    const uint32_t c3 = table[rgb332[3]];
-
-    dst[0] = crt_composite_sample_p0(c0);
-    dst[1] = crt_composite_sample_p1(c0);
-    dst[2] = crt_composite_sample_p2(c0);
-    dst[3] = crt_composite_sample_p3(c1);
-    dst[4] = crt_composite_sample_p0(c1);
-    dst[5] = crt_composite_sample_p1(c1);
-    dst[6] = crt_composite_sample_p2(c2);
-    dst[7] = crt_composite_sample_p3(c2);
-    dst[8] = crt_composite_sample_p0(c2);
-    dst[9] = crt_composite_sample_p1(c3);
-    dst[10] = crt_composite_sample_p2(c3);
-    dst[11] = crt_composite_sample_p3(c3);
+    CRT_COMPOSITE_QUAD_FROM_TABLE(table, rgb332, dst);
 }
 
-void crt_composite_rgb332_render_256_to_768(crt_video_standard_t standard, uint16_t line_index,
-                                            const uint8_t src[CRT_COMPOSITE_RGB332_WIDTH],
-                                            uint16_t dst[CRT_COMPOSITE_RGB332_ACTIVE_WIDTH])
+IRAM_ATTR void
+crt_composite_rgb332_render_256_to_768(crt_video_standard_t standard, uint16_t line_index,
+                                       const uint8_t src[CRT_COMPOSITE_RGB332_WIDTH],
+                                       uint16_t dst[CRT_COMPOSITE_RGB332_ACTIVE_WIDTH])
 {
     if (src == NULL || dst == NULL) {
         return;
     }
-
-    for (uint16_t pixel = 0, sample = 0; pixel < CRT_COMPOSITE_RGB332_WIDTH;
-         pixel = (uint16_t)(pixel + 4U), sample = (uint16_t)(sample + 12U)) {
-        crt_composite_rgb332_encode_quad(standard, line_index, &src[pixel], &dst[sample]);
+    /* Resolve the standard/phase table once per line. The inner loop is
+     * the actual hot path: 64 quads × 12 samples = 768 DAC samples per
+     * scanline. Inlining via the macro avoids the per-quad function call
+     * cost that previously stalled the prep task. */
+    const uint32_t *table = crt_composite_rgb332_table(standard, line_index);
+    const uint8_t *s = src;
+    uint16_t *d = dst;
+    for (uint16_t pixel = 0; pixel < CRT_COMPOSITE_RGB332_WIDTH; pixel = (uint16_t)(pixel + 4U)) {
+        CRT_COMPOSITE_QUAD_FROM_TABLE(table, s, d);
+        s += 4;
+        d += 12;
     }
 }

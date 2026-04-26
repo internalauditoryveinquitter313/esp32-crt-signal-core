@@ -1,11 +1,11 @@
 #ifndef CRT_SCANLINE_H
 #define CRT_SCANLINE_H
 
-#include <stdint.h>
+#include "crt_timing_types.h"
 
 #include "esp_err.h"
 
-#include "crt_timing_types.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -93,10 +93,8 @@ typedef void (*crt_frame_hook_fn)(uint32_t frame_number, void *user_data);
  * The core passes only the active region buffer, isolating sync, porch, and
  * burst handling from content rendering.
  */
-typedef void (*crt_scanline_hook_fn)(const crt_scanline_t *scanline,
-                                     uint16_t *active_buf,
-                                     uint16_t active_width,
-                                     void *user_data);
+typedef void (*crt_scanline_hook_fn)(const crt_scanline_t *scanline, uint16_t *active_buf,
+                                     uint16_t active_width, void *user_data);
 
 /**
  * @brief Post-render modulation hook for full-line perturbations.
@@ -104,10 +102,8 @@ typedef void (*crt_scanline_hook_fn)(const crt_scanline_t *scanline,
  * This hook sees the full line buffer after core composition and active region
  * rendering, enabling deterministic effects such as phase sweep or wobble.
  */
-typedef void (*crt_mod_hook_fn)(const crt_scanline_t *scanline,
-                                uint16_t *line_buf,
-                                uint16_t line_width,
-                                void *user_data);
+typedef void (*crt_mod_hook_fn)(const crt_scanline_t *scanline, uint16_t *line_buf,
+                                uint16_t line_width, void *user_data);
 
 /**
  * @brief Register a frame hook.
@@ -136,8 +132,7 @@ esp_err_t crt_register_mod_hook(crt_mod_hook_fn hook, void *user_data);
 #define CRT_PHASE_Q20_FULL_CYCLE ((uint32_t)0x100000U)
 
 /** Advance phase by step with Q20 wrap */
-#define CRT_PHASE_Q20_ADVANCE(phase, step) \
-    (((phase) + (step)) & CRT_SCANLINE_SUBCARRIER_PHASE_MASK)
+#define CRT_PHASE_Q20_ADVANCE(phase, step) (((phase) + (step)) & CRT_SCANLINE_SUBCARRIER_PHASE_MASK)
 
 /** Check if scanline is an active (visible) line */
 #define CRT_SCANLINE_IS_ACTIVE(s) ((s)->type == CRT_LINE_ACTIVE)

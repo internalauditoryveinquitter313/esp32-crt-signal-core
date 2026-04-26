@@ -10,13 +10,15 @@
 /* ── Internal helpers ─────────────────────────────────────────────── */
 
 /* True when v is a positive power of two. */
-static inline bool is_pow2(uint16_t v) {
+static inline bool is_pow2(uint16_t v)
+{
     return v != 0u && (v & (uint16_t)(v - 1u)) == 0u;
 }
 
 /* Wrap x into [0, mod). mod must be > 0. For power-of-two mod the
  * caller should use `& (mod - 1)` in the hot path instead. */
-static inline uint16_t wrap_u16(int v, int mod) {
+static inline uint16_t wrap_u16(int v, int mod)
+{
     int r = v % mod;
     if (r < 0)
         r += mod;
@@ -27,7 +29,8 @@ static inline uint16_t wrap_u16(int v, int mod) {
 
 esp_err_t crt_tile_init(crt_tile_layer_t *t, uint16_t visible_w, uint16_t visible_h,
                         uint16_t pitch_w, uint16_t pitch_h, const uint8_t *pattern_table,
-                        uint16_t pattern_count, uint8_t *nametable) {
+                        uint16_t pattern_count, uint8_t *nametable)
+{
     ESP_RETURN_ON_FALSE(t != NULL, ESP_ERR_INVALID_ARG, "crt_tile", "null state");
     ESP_RETURN_ON_FALSE(visible_w > 0 && visible_h > 0, ESP_ERR_INVALID_ARG, "crt_tile",
                         "zero visible dim");
@@ -39,37 +42,27 @@ esp_err_t crt_tile_init(crt_tile_layer_t *t, uint16_t visible_w, uint16_t visibl
                         "pattern_count > 256");
     ESP_RETURN_ON_FALSE(nametable != NULL, ESP_ERR_INVALID_ARG, "crt_tile", "null nametable");
 
-    *t = (crt_tile_layer_t)
-    {
+    *t = (crt_tile_layer_t){
         .visible_w_tiles = visible_w,
         .visible_h_tiles = visible_h,
-        .
-        pitch_w_tiles = pitch_w,
-        .
-        pitch_h_tiles = pitch_h,
-        .
-        pitch_w_mask = is_pow2(pitch_w) ? (uint16_t)(pitch_w - 1u) : 0u,
-        .
-        pitch_h_mask = is_pow2(pitch_h) ? (uint16_t)(pitch_h - 1u) : 0u,
-        .
-        pattern_table = pattern_table,
-        .
-        pattern_count = pattern_count,
-        .
-        nametable = nametable,
-        .
-        scroll_x_px = 0,
-        .
-        scroll_y_px = 0,
-        .
-        palette = NULL,
+        .pitch_w_tiles = pitch_w,
+        .pitch_h_tiles = pitch_h,
+        .pitch_w_mask = is_pow2(pitch_w) ? (uint16_t)(pitch_w - 1u) : 0u,
+        .pitch_h_mask = is_pow2(pitch_h) ? (uint16_t)(pitch_h - 1u) : 0u,
+        .pattern_table = pattern_table,
+        .pattern_count = pattern_count,
+        .nametable = nametable,
+        .scroll_x_px = 0,
+        .scroll_y_px = 0,
+        .palette = NULL,
     };
     return ESP_OK;
 }
 
 /* ── Mutation ─────────────────────────────────────────────────────── */
 
-void crt_tile_set_tile(crt_tile_layer_t *t, uint16_t col, uint16_t row, uint8_t tile_idx) {
+void crt_tile_set_tile(crt_tile_layer_t *t, uint16_t col, uint16_t row, uint8_t tile_idx)
+{
     if (t == NULL || t->nametable == NULL)
         return;
     if (col >= t->pitch_w_tiles || row >= t->pitch_h_tiles)
@@ -143,14 +136,13 @@ static IRAM_ATTR void tile_render_logical_line(const crt_tile_layer_t *t, uint16
     uint16_t fine = scroll_fine_x;
 
     while (remaining > 0u) {
-        const uint16_t wrapped_col = (t->pitch_w_mask != 0u)
-                                         ? (uint16_t)(col & t->pitch_w_mask)
-                                         : (uint16_t)(col % t->pitch_w_tiles);
+        const uint16_t wrapped_col = (t->pitch_w_mask != 0u) ? (uint16_t)(col & t->pitch_w_mask)
+                                                             : (uint16_t)(col % t->pitch_w_tiles);
         uint8_t idx = nametable_row[wrapped_col];
         if (idx >= pattern_count)
             idx = 0;
         const uint8_t *tile_line =
-                &pattern[(size_t) idx * CRT_TILE_BYTES + (size_t) fine_y * CRT_TILE_PX_W];
+            &pattern[(size_t)idx * CRT_TILE_BYTES + (size_t)fine_y * CRT_TILE_PX_W];
         uint16_t take = (uint16_t)(CRT_TILE_PX_W - fine);
         if (take > remaining)
             take = remaining;
@@ -220,7 +212,8 @@ IRAM_ATTR bool crt_tile_layer_fetch(void *ctx, uint16_t logical_line, uint8_t *i
 /* ── Fused scanline hook ──────────────────────────────────────────── */
 
 IRAM_ATTR void crt_tile_scanline_hook(const crt_scanline_t *scanline, uint16_t *active_buf,
-                                      uint16_t active_width, void *user_data) {
+                                      uint16_t active_width, void *user_data)
+{
     const crt_tile_layer_t *t = (const crt_tile_layer_t *)user_data;
     if (scanline == NULL || t == NULL || active_buf == NULL || active_width == 0u ||
         t->palette == NULL || !CRT_SCANLINE_HAS_LOGICAL(scanline)) {
@@ -271,7 +264,7 @@ IRAM_ATTR void crt_tile_scanline_hook(const crt_scanline_t *scanline, uint16_t *
      * Ceiling step aligns with the fast-path 3:1 replication so both
      * paths produce bit-identical output for matching dimensions. */
     uint32_t step =
-            (((uint32_t) logical_w_px << 16) + (uint32_t) active_width - 1u) / (uint32_t) active_width;
+        (((uint32_t)logical_w_px << 16) + (uint32_t)active_width - 1u) / (uint32_t)active_width;
     uint32_t acc = 0;
     const uint16_t even_width = active_width & (uint16_t)~1U;
     uint16_t i = 0;

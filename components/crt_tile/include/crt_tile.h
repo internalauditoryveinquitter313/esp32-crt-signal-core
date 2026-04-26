@@ -1,13 +1,13 @@
 #ifndef CRT_TILE_HEADER_H
 #define CRT_TILE_HEADER_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "crt_scanline.h"
 
 #include "esp_err.h"
 
-#include "crt_scanline.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,8 +42,8 @@ extern "C" {
  *                                 crt_tile_scanline_hook, &tile);
  */
 
-#define CRT_TILE_PX_W 8u
-#define CRT_TILE_PX_H 8u
+#define CRT_TILE_PX_W  8u
+#define CRT_TILE_PX_H  8u
 #define CRT_TILE_BYTES ((size_t)(CRT_TILE_PX_W * CRT_TILE_PX_H))
 
 typedef struct {
@@ -93,16 +93,13 @@ typedef struct {
  *
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG otherwise.
  */
-esp_err_t crt_tile_init(crt_tile_layer_t *t,
-                        uint16_t visible_w, uint16_t visible_h,
-                        uint16_t pitch_w, uint16_t pitch_h,
-                        const uint8_t *pattern_table, uint16_t pattern_count,
-                        uint8_t *nametable);
+esp_err_t crt_tile_init(crt_tile_layer_t *t, uint16_t visible_w, uint16_t visible_h,
+                        uint16_t pitch_w, uint16_t pitch_h, const uint8_t *pattern_table,
+                        uint16_t pattern_count, uint8_t *nametable);
 
 /* ── Mutation ─────────────────────────────────────────────────────── */
 
-void    crt_tile_set_tile(crt_tile_layer_t *t, uint16_t col, uint16_t row,
-                          uint8_t tile_idx);
+void crt_tile_set_tile(crt_tile_layer_t *t, uint16_t col, uint16_t row, uint8_t tile_idx);
 uint8_t crt_tile_get_tile(const crt_tile_layer_t *t, uint16_t col, uint16_t row);
 
 /**
@@ -118,10 +115,7 @@ void crt_tile_set_scroll(crt_tile_layer_t *t, int x_px, int y_px);
  * @brief crt_compose layer fetch adapter. Always returns true (opaque
  *        base); out-of-range rows are zero-filled as a soft guard.
  */
-bool crt_tile_layer_fetch(void *ctx,
-                          uint16_t logical_line,
-                          uint8_t *idx_out,
-                          uint16_t width);
+bool crt_tile_layer_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out, uint16_t width);
 
 /**
  * @brief Fused scanline hook mirroring crt_fb_scanline_hook. Writes
@@ -130,10 +124,8 @@ bool crt_tile_layer_fetch(void *ctx,
  *        so compose can delegate directly on lines where no keyed
  *        overlay contributes.
  */
-void crt_tile_scanline_hook(const crt_scanline_t *scanline,
-                            uint16_t *active_buf,
-                            uint16_t active_width,
-                            void *user_data);
+void crt_tile_scanline_hook(const crt_scanline_t *scanline, uint16_t *active_buf,
+                            uint16_t active_width, void *user_data);
 
 /**
  * @brief Palette used by crt_tile_scanline_hook. Must be set to the

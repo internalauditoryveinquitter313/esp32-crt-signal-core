@@ -2,7 +2,8 @@
 
 #include <math.h>
 
-void crt_waveform_fill_ntsc_burst_template(uint16_t *samples, size_t sample_count, uint16_t blank_level)
+void crt_waveform_fill_ntsc_burst_template(uint16_t *samples, size_t sample_count,
+                                           uint16_t blank_level)
 {
     const uint16_t amplitude = (uint16_t)(blank_level / 2U);
 
@@ -21,10 +22,8 @@ void crt_waveform_fill_ntsc_burst_template(uint16_t *samples, size_t sample_coun
     }
 }
 
-void crt_waveform_fill_pal_burst_template(uint16_t *samples,
-                                          size_t sample_count,
-                                          uint16_t blank_level,
-                                          bool invert_phase)
+void crt_waveform_fill_pal_burst_template(uint16_t *samples, size_t sample_count,
+                                          uint16_t blank_level, bool invert_phase)
 {
     const int32_t amplitude = (int32_t)lroundf((float)blank_level * 0.47140452f);
     static const int8_t k_phase_a[4] = {-1, 1, 1, -1};

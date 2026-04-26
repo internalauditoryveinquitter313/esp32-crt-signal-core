@@ -233,6 +233,10 @@ IRAM_ATTR bool crt_fb_layer_fetch(void *ctx, uint16_t logical_line, uint8_t *idx
     }
 
     const uint8_t *row = &surface->buffer[(size_t)logical_line * surface->width];
+    if (width == surface->width) {
+        memcpy(idx_out, row, width);
+        return true;
+    }
     uint32_t step = ((uint32_t)surface->width << 16) / width;
     uint32_t acc = 0;
     for (uint16_t x = 0; x < width; ++x) {
