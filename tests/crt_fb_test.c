@@ -8,14 +8,14 @@
  *     -o /tmp/crt_fb_test
  */
 
+#include "crt_fb.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "crt_fb.h"
-
-#define BLANK_LEVEL  ((uint16_t)(23U << 8))
-#define WHITE_LEVEL  ((uint16_t)(0xFFU << 8))
+#define BLANK_LEVEL ((uint16_t)(23U << 8))
+#define WHITE_LEVEL ((uint16_t)(0xFFU << 8))
 
 /* ── Surface lifecycle ────────────────────────────────────────────── */
 
@@ -133,12 +133,14 @@ static void test_layer_fetch_adapter(void)
     /* Line out of bounds -> zero fill */
     memset(out, 0xFF, sizeof(out));
     crt_fb_layer_fetch(&s, 99, out, 8);
-    for (int i = 0; i < 8; ++i) assert(out[i] == 0);
+    for (int i = 0; i < 8; ++i)
+        assert(out[i] == 0);
 
     /* Null surface -> zero fill */
     memset(out, 0xFF, sizeof(out));
     crt_fb_layer_fetch(NULL, 0, out, 8);
-    for (int i = 0; i < 8; ++i) assert(out[i] == 0);
+    for (int i = 0; i < 8; ++i)
+        assert(out[i] == 0);
 
     crt_fb_surface_deinit(&s);
     printf("  layer fetch adapter: OK\n");
@@ -195,9 +197,17 @@ static void test_scanline_hook(void)
         .type = CRT_LINE_BLANK,
         .timing = &timing,
     };
-    uint16_t blank_buf[4] = { 0xDEAD, 0xDEAD, 0xDEAD, 0xDEAD };
+    uint16_t blank_buf[4] = {0xDEAD, 0xDEAD, 0xDEAD, 0xDEAD};
     crt_fb_scanline_hook(&blank_sc, blank_buf, 4, &s);
     assert(blank_buf[0] == 0xDEAD); /* untouched */
+
+    /* Invalid hook inputs should be no-op, not crashes/division by zero. */
+    uint16_t guard_buf[4] = {0xBEEF, 0xBEEF, 0xBEEF, 0xBEEF};
+    crt_fb_scanline_hook(NULL, guard_buf, 4, &s);
+    crt_fb_scanline_hook(&sc, NULL, 4, &s);
+    crt_fb_scanline_hook(&sc, guard_buf, 0, &s);
+    crt_fb_scanline_hook(&sc, guard_buf, 4, NULL);
+    assert(guard_buf[0] == 0xBEEF);
 
     crt_fb_surface_deinit(&s);
     printf("  scanline hook: OK\n");

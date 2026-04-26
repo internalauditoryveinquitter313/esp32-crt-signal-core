@@ -8,11 +8,11 @@
  *     -o /tmp/crt_compose_test && /tmp/crt_compose_test
  */
 
+#include "crt_compose.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-
-#include "crt_compose.h"
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
@@ -31,7 +31,8 @@ static crt_scanline_t make_active_line(uint16_t logical)
     memset(&timing, 0, sizeof(timing));
     timing.total_lines = 262;
     timing.active_lines = 240;
-    return (crt_scanline_t) {
+    return (crt_scanline_t)
+    {
         .physical_line = logical + 20,
         .logical_line = logical,
         .type = CRT_LINE_ACTIVE,
@@ -48,9 +49,7 @@ typedef struct {
     uint8_t step;
 } pattern_ctx_t;
 
-static bool pattern_fetch(void *ctx, uint16_t logical_line,
-                          uint8_t *idx_out, uint16_t width)
-{
+static bool pattern_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out, uint16_t width) {
     const pattern_ctx_t *p = (const pattern_ctx_t *)ctx;
     for (uint16_t x = 0; x < width; ++x) {
         idx_out[x] = (uint8_t)(p->base + (logical_line * p->step) + (uint8_t)x);
@@ -64,9 +63,7 @@ typedef struct {
     uint8_t key;
 } sprite_ctx_t;
 
-static bool sprite_fetch(void *ctx, uint16_t logical_line,
-                         uint8_t *idx_out, uint16_t width)
-{
+static bool sprite_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out, uint16_t width) {
     const sprite_ctx_t *s = (const sprite_ctx_t *)ctx;
     (void)logical_line;
     for (uint16_t x = 0; x < width; ++x) {
@@ -82,9 +79,7 @@ static uint32_t g_mock_base_override_calls;
 static uint32_t g_mock_absent_overlay_calls;
 
 /* mock_base_fetch: writes `(x + y) & 0xFF` per pixel. */
-static bool mock_base_fetch(void *ctx, uint16_t logical_line,
-                            uint8_t *idx_out, uint16_t width)
-{
+static bool mock_base_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out, uint16_t width) {
     (void)ctx;
     g_mock_base_fetch_calls++;
     for (uint16_t x = 0; x < width; ++x) {
@@ -96,11 +91,8 @@ static bool mock_base_fetch(void *ctx, uint16_t logical_line,
 /* mock_base_override: writes palette[(x + y) & 0xFF] with the same word-swap
  * as the generic compose output pass. Guarantees bit-exact parity with
  * mock_base_fetch + palette + swap. */
-static void mock_base_override(const crt_scanline_t *scanline,
-                               uint16_t *active_buf,
-                               uint16_t active_width,
-                               void *user_data)
-{
+static void mock_base_override(const crt_scanline_t *scanline, uint16_t *active_buf,
+                               uint16_t active_width, void *user_data) {
     (void)user_data;
     g_mock_base_override_calls++;
     const uint16_t *pal = g_palette;
@@ -110,7 +102,7 @@ static void mock_base_override(const crt_scanline_t *scanline,
     for (; i < even_width; i += 2) {
         uint16_t p0 = pal[(uint8_t)(i + y)];
         uint16_t p1 = pal[(uint8_t)(i + 1 + y)];
-        active_buf[i]     = p1;
+        active_buf[i] = p1;
         active_buf[i + 1] = p0;
     }
     if (i < active_width) {
@@ -120,10 +112,12 @@ static void mock_base_override(const crt_scanline_t *scanline,
 
 /* mock_absent_overlay_fetch: keyed layer that never contributes. Must NOT
  * touch idx_out; compose is required to skip merge when false is returned. */
-static bool mock_absent_overlay_fetch(void *ctx, uint16_t logical_line,
-                                      uint8_t *idx_out, uint16_t width)
-{
-    (void)ctx; (void)logical_line; (void)idx_out; (void)width;
+static bool mock_absent_overlay_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out,
+                                      uint16_t width) {
+    (void) ctx;
+    (void) logical_line;
+    (void) idx_out;
+    (void) width;
     g_mock_absent_overlay_calls++;
     return false;
 }
@@ -141,9 +135,7 @@ typedef struct {
     uint8_t fill;
 } counting_ctx_t;
 
-static bool counting_fetch(void *ctx, uint16_t logical_line,
-                           uint8_t *idx_out, uint16_t width)
-{
+static bool counting_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out, uint16_t width) {
     counting_ctx_t *c = (counting_ctx_t *)ctx;
     (void)logical_line;
     c->calls++;
@@ -164,6 +156,16 @@ static void test_init_and_palette(void)
     assert(crt_compose_set_palette(&c, g_palette, 256) == 0);
     assert(c.palette == g_palette);
     assert(c.palette_size == 256);
+
+    assert(crt_compose_set_palette(&c, g_palette, 255) == ESP_ERR_INVALID_SIZE);
+    assert(c.palette == g_palette);
+    assert(c.palette_size == 256);
+
+    assert(crt_compose_set_palette(&c, NULL, 0) == 0);
+    assert(c.palette == NULL);
+    assert(c.palette_size == 0);
+
+    assert(crt_compose_set_palette(&c, g_palette, 256) == 0);
     printf("  init/palette: OK\n");
 }
 
@@ -172,14 +174,12 @@ static void test_add_layer_limits(void)
     crt_compose_t c;
     crt_compose_init(&c);
 
-    pattern_ctx_t pc = { .base = 0, .step = 1 };
+    pattern_ctx_t pc = {.base = 0, .step = 1};
     for (uint8_t i = 0; i < CRT_COMPOSE_MAX_LAYERS; ++i) {
-        assert(crt_compose_add_layer(&c, pattern_fetch, &pc,
-                                     CRT_COMPOSE_NO_TRANSPARENCY) == 0);
+        assert(crt_compose_add_layer(&c, pattern_fetch, &pc, CRT_COMPOSE_NO_TRANSPARENCY) == 0);
     }
     /* One past max should fail */
-    assert(crt_compose_add_layer(&c, pattern_fetch, &pc,
-                                 CRT_COMPOSE_NO_TRANSPARENCY) != 0);
+    assert(crt_compose_add_layer(&c, pattern_fetch, &pc, CRT_COMPOSE_NO_TRANSPARENCY) != 0);
     assert(c.layer_count == CRT_COMPOSE_MAX_LAYERS);
 
     crt_compose_clear_layers(&c);
@@ -194,9 +194,8 @@ static void test_single_opaque_layer_with_swap(void)
     init_linear_palette();
     crt_compose_set_palette(&c, g_palette, 256);
 
-    pattern_ctx_t pc = { .base = 10, .step = 0 };  /* line = 10, 11, 12, 13, ... */
-    assert(crt_compose_add_layer(&c, pattern_fetch, &pc,
-                                 CRT_COMPOSE_NO_TRANSPARENCY) == 0);
+    pattern_ctx_t pc = {.base = 10, .step = 0}; /* line = 10, 11, 12, 13, ... */
+    assert(crt_compose_add_layer(&c, pattern_fetch, &pc, CRT_COMPOSE_NO_TRANSPARENCY) == 0);
 
     uint16_t active_buf[8] = {0};
     crt_scanline_t sc = make_active_line(0);
@@ -227,16 +226,16 @@ static void test_odd_width_tail(void)
     init_linear_palette();
     crt_compose_set_palette(&c, g_palette, 256);
 
-    pattern_ctx_t pc = { .base = 0, .step = 0 };  /* 0,1,2 */
+    pattern_ctx_t pc = {.base = 0, .step = 0}; /* 0,1,2 */
     crt_compose_add_layer(&c, pattern_fetch, &pc, CRT_COMPOSE_NO_TRANSPARENCY);
 
-    uint16_t active_buf[3] = { 0xDEAD, 0xDEAD, 0xDEAD };
+    uint16_t active_buf[3] = {0xDEAD, 0xDEAD, 0xDEAD};
     crt_scanline_t sc = make_active_line(0);
     crt_compose_scanline_hook(&sc, active_buf, 3, &c);
 
     assert(active_buf[0] == g_palette[1]);
     assert(active_buf[1] == g_palette[0]);
-    assert(active_buf[2] == g_palette[2]);  /* tail, un-swapped */
+    assert(active_buf[2] == g_palette[2]); /* tail, un-swapped */
     printf("  odd-width tail: OK\n");
 }
 
@@ -248,11 +247,11 @@ static void test_transparent_overlay(void)
     crt_compose_set_palette(&c, g_palette, 256);
 
     /* Layer 0: solid 50 (opaque) */
-    counting_ctx_t bg = { .calls = 0, .fill = 50 };
+    counting_ctx_t bg = {.calls = 0, .fill = 50};
     crt_compose_add_layer(&c, counting_fetch, &bg, CRT_COMPOSE_NO_TRANSPARENCY);
 
     /* Layer 1: sprite value=99, key=0; pattern= 99,0,0,99,0,0,99,0 */
-    sprite_ctx_t spr = { .value = 99, .key = 0 };
+    sprite_ctx_t spr = {.value = 99, .key = 0};
     crt_compose_add_layer(&c, sprite_fetch, &spr, 0);
 
     uint16_t active_buf[8] = {0};
@@ -287,7 +286,7 @@ static void test_disabled_layer_skipped(void)
     crt_compose_set_palette(&c, g_palette, 256);
     crt_compose_set_clear_index(&c, 7);
 
-    counting_ctx_t ctx = { .calls = 0, .fill = 200 };
+    counting_ctx_t ctx = {.calls = 0, .fill = 200};
     crt_compose_add_layer(&c, counting_fetch, &ctx, CRT_COMPOSE_NO_TRANSPARENCY);
     crt_compose_set_layer_enabled(&c, 0, false);
 
@@ -304,9 +303,7 @@ static void test_disabled_layer_skipped(void)
     printf("  disabled layer + clear_idx: OK\n");
 }
 
-static bool absent_fetch(void *ctx, uint16_t logical_line,
-                         uint8_t *idx_out, uint16_t width)
-{
+static bool absent_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out, uint16_t width) {
     uint32_t *calls = (uint32_t *)ctx;
     (void)logical_line;
     (void)idx_out;
@@ -324,7 +321,7 @@ static void test_keyed_absent_skips_merge(void)
     crt_compose_set_palette(&c, g_palette, 256);
 
     /* Layer 0: solid 77 (opaque BG) */
-    counting_ctx_t bg = { .calls = 0, .fill = 77 };
+    counting_ctx_t bg = {.calls = 0, .fill = 77};
     crt_compose_add_layer(&c, counting_fetch, &bg, CRT_COMPOSE_NO_TRANSPARENCY);
 
     /* Layer 1: keyed overlay that reports "not present" */
@@ -352,9 +349,9 @@ static void test_opaque_base_skips_clear(void)
     crt_compose_init(&c);
     init_linear_palette();
     crt_compose_set_palette(&c, g_palette, 256);
-    crt_compose_set_clear_index(&c, 33);  /* would be visible if clear happened */
+    crt_compose_set_clear_index(&c, 33); /* would be visible if clear happened */
 
-    counting_ctx_t bg = { .calls = 0, .fill = 101 };
+    counting_ctx_t bg = {.calls = 0, .fill = 101};
     crt_compose_add_layer(&c, counting_fetch, &bg, CRT_COMPOSE_NO_TRANSPARENCY);
 
     uint16_t active_buf[4] = {0};
@@ -378,8 +375,7 @@ static void test_fused_base_solo_delegates(void)
     crt_compose_set_palette(&c, g_palette, 256);
     reset_mock_counters();
 
-    assert(crt_compose_add_layer_fused(&c, mock_base_fetch,
-                                       mock_base_override, NULL) == 0);
+    assert(crt_compose_add_layer_fused(&c, mock_base_fetch, mock_base_override, NULL) == 0);
 
     uint16_t buf[8] = {0};
     crt_scanline_t sc = make_active_line(3);
@@ -439,7 +435,7 @@ static void test_fused_base_plus_present_overlay_materializes(void)
     reset_mock_counters();
 
     crt_compose_add_layer_fused(&c, mock_base_fetch, mock_base_override, NULL);
-    counting_ctx_t overlay = { .calls = 0, .fill = 99 };
+    counting_ctx_t overlay = {.calls = 0, .fill = 99};
     crt_compose_add_layer(&c, counting_fetch, &overlay, 0);
 
     uint16_t buf[4] = {0};
@@ -467,7 +463,7 @@ static void test_fused_vs_generic_parity(void)
     init_linear_palette();
     crt_scanline_t sc = make_active_line(7);
 
-    uint16_t buf_fused[16]   = {0};
+    uint16_t buf_fused[16] = {0};
     uint16_t buf_generic[16] = {0};
 
     {
@@ -483,8 +479,7 @@ static void test_fused_vs_generic_parity(void)
         crt_compose_init(&c);
         crt_compose_set_palette(&c, g_palette, 256);
         /* No override -> compose takes the generic path. */
-        crt_compose_add_layer(&c, mock_base_fetch, NULL,
-                              CRT_COMPOSE_NO_TRANSPARENCY);
+        crt_compose_add_layer(&c, mock_base_fetch, NULL, CRT_COMPOSE_NO_TRANSPARENCY);
         crt_compose_scanline_hook(&sc, buf_generic, 16, &c);
     }
 
@@ -501,10 +496,10 @@ static void test_non_active_line_noop(void)
     init_linear_palette();
     crt_compose_set_palette(&c, g_palette, 256);
 
-    counting_ctx_t ctx = { .calls = 0, .fill = 1 };
+    counting_ctx_t ctx = {.calls = 0, .fill = 1};
     crt_compose_add_layer(&c, counting_fetch, &ctx, CRT_COMPOSE_NO_TRANSPARENCY);
 
-    uint16_t active_buf[4] = { 0xBEEF, 0xBEEF, 0xBEEF, 0xBEEF };
+    uint16_t active_buf[4] = {0xBEEF, 0xBEEF, 0xBEEF, 0xBEEF};
     crt_scanline_t blank = {
         .physical_line = 250,
         .logical_line = CRT_SCANLINE_LOGICAL_LINE_NONE,
@@ -524,10 +519,10 @@ static void test_missing_palette_noop(void)
     crt_compose_init(&c);
     /* No palette set */
 
-    counting_ctx_t ctx = { .calls = 0, .fill = 1 };
+    counting_ctx_t ctx = {.calls = 0, .fill = 1};
     crt_compose_add_layer(&c, counting_fetch, &ctx, CRT_COMPOSE_NO_TRANSPARENCY);
 
-    uint16_t active_buf[4] = { 0xCAFE, 0xCAFE, 0xCAFE, 0xCAFE };
+    uint16_t active_buf[4] = {0xCAFE, 0xCAFE, 0xCAFE, 0xCAFE};
     crt_scanline_t sc = make_active_line(0);
     crt_compose_scanline_hook(&sc, active_buf, 4, &c);
 
@@ -543,7 +538,7 @@ static void test_width_overflow_guarded(void)
     init_linear_palette();
     crt_compose_set_palette(&c, g_palette, 256);
 
-    counting_ctx_t ctx = { .calls = 0, .fill = 1 };
+    counting_ctx_t ctx = {.calls = 0, .fill = 1};
     crt_compose_add_layer(&c, counting_fetch, &ctx, CRT_COMPOSE_NO_TRANSPARENCY);
 
     /* active_width > MAX must not invoke fetch or touch buffer */
@@ -554,6 +549,27 @@ static void test_width_overflow_guarded(void)
     assert(ctx.calls == 0);
     assert(buf == 0x1234);
     printf("  oversize width guarded: OK\n");
+}
+
+static void test_invalid_hook_inputs_noop(void) {
+    crt_compose_t c;
+    crt_compose_init(&c);
+    init_linear_palette();
+    crt_compose_set_palette(&c, g_palette, 256);
+
+    counting_ctx_t ctx = {.calls = 0, .fill = 1};
+    crt_compose_add_layer(&c, counting_fetch, &ctx, CRT_COMPOSE_NO_TRANSPARENCY);
+
+    crt_scanline_t sc = make_active_line(0);
+    uint16_t buf[4] = {0xBEEF, 0xBEEF, 0xBEEF, 0xBEEF};
+    crt_compose_scanline_hook(NULL, buf, 4, &c);
+    crt_compose_scanline_hook(&sc, NULL, 4, &c);
+    crt_compose_scanline_hook(&sc, buf, 0, &c);
+    crt_compose_scanline_hook(&sc, buf, 4, NULL);
+
+    assert(ctx.calls == 0);
+    assert(buf[0] == 0xBEEF);
+    printf("  invalid hook inputs are no-op: OK\n");
 }
 
 /* ── Main ─────────────────────────────────────────────────────────── */
@@ -576,6 +592,7 @@ int main(void)
     test_non_active_line_noop();
     test_missing_palette_noop();
     test_width_overflow_guarded();
+    test_invalid_hook_inputs_noop();
     printf("ALL PASSED\n");
     return 0;
 }

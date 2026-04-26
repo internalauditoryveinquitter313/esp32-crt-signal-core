@@ -1,21 +1,22 @@
 #include "crt_fb.h"
 
-#include <stdlib.h>
-#include <string.h>
-
 #include "esp_attr.h"
 #include "esp_check.h"
 
-#define CRT_FB_PALETTE_SIZE_INDEXED8  256
+#include <stdlib.h>
+#include <string.h>
+
+#define CRT_FB_PALETTE_SIZE_INDEXED8 256
 
 /* ── Lifecycle ────────────────────────────────────────────────────── */
 
-esp_err_t crt_fb_surface_init(crt_fb_surface_t *surface, uint16_t width, uint16_t height, crt_fb_format_t format)
-{
+esp_err_t crt_fb_surface_init(crt_fb_surface_t *surface, uint16_t width, uint16_t height,
+                              crt_fb_format_t format) {
     ESP_RETURN_ON_FALSE(surface != NULL, ESP_ERR_INVALID_ARG, "crt_fb", "surface is null");
     ESP_RETURN_ON_FALSE(width > 0 && height > 0, ESP_ERR_INVALID_ARG, "crt_fb", "zero dimension");
 
-    *surface = (crt_fb_surface_t) {
+    *surface = (crt_fb_surface_t)
+    {
         .width = width,
         .height = height,
         .format = format,
@@ -33,7 +34,8 @@ esp_err_t crt_fb_surface_alloc(crt_fb_surface_t *surface)
     uint16_t palette_entries;
 
     ESP_RETURN_ON_FALSE(surface != NULL, ESP_ERR_INVALID_ARG, "crt_fb", "surface is null");
-    ESP_RETURN_ON_FALSE(surface->buffer == NULL, ESP_ERR_INVALID_STATE, "crt_fb", "already allocated");
+    ESP_RETURN_ON_FALSE(surface->buffer == NULL, ESP_ERR_INVALID_STATE, "crt_fb",
+                        "already allocated");
 
     switch (surface->format) {
     case CRT_FB_FORMAT_INDEXED8:
@@ -45,7 +47,8 @@ esp_err_t crt_fb_surface_alloc(crt_fb_surface_t *surface)
     }
 
     surface->buffer = calloc(1, buf_size);
-    ESP_RETURN_ON_FALSE(surface->buffer != NULL, ESP_ERR_NO_MEM, "crt_fb", "buffer alloc failed (%u bytes)", (unsigned)buf_size);
+    ESP_RETURN_ON_FALSE(surface->buffer != NULL, ESP_ERR_NO_MEM, "crt_fb",
+                        "buffer alloc failed (%u bytes)", (unsigned) buf_size);
     surface->buffer_size = buf_size;
 
     surface->palette = calloc(palette_entries, sizeof(uint16_t));
@@ -97,7 +100,8 @@ uint8_t *crt_fb_row(const crt_fb_surface_t *surface, uint16_t y)
 
 void crt_fb_put(crt_fb_surface_t *surface, uint16_t x, uint16_t y, uint8_t value)
 {
-    if (surface == NULL || surface->buffer == NULL) return;
+    if (surface == NULL || surface->buffer == NULL)
+        return;
     if (x < surface->width && y < surface->height) {
         surface->buffer[(size_t)y * surface->width + x] = value;
     }
@@ -105,7 +109,8 @@ void crt_fb_put(crt_fb_surface_t *surface, uint16_t x, uint16_t y, uint8_t value
 
 uint8_t crt_fb_get(const crt_fb_surface_t *surface, uint16_t x, uint16_t y)
 {
-    if (surface == NULL || surface->buffer == NULL) return 0;
+    if (surface == NULL || surface->buffer == NULL)
+        return 0;
     if (x < surface->width && y < surface->height) {
         return surface->buffer[(size_t)y * surface->width + x];
     }
@@ -128,32 +133,27 @@ void crt_fb_palette_set(crt_fb_surface_t *surface, uint8_t index, uint16_t dac_l
     }
 }
 
-void crt_fb_palette_init_grayscale(crt_fb_surface_t *surface,
-                                   uint16_t blank_level,
+void crt_fb_palette_init_grayscale(crt_fb_surface_t *surface, uint16_t blank_level,
                                    uint16_t white_level)
 {
     if (surface == NULL || surface->palette == NULL || surface->palette_size < 2) {
         return;
     }
     for (uint16_t i = 0; i < surface->palette_size; ++i) {
-        surface->palette[i] = (uint16_t)(blank_level +
-            (uint32_t)i * (white_level - blank_level) / (surface->palette_size - 1));
+        surface->palette[i] = (uint16_t)(blank_level + (uint32_t) i * (white_level - blank_level) /
+                                         (surface->palette_size - 1));
     }
 }
 
 /* ── Scanline hook ────────────────────────────────────────────────── */
 
-IRAM_ATTR void crt_fb_scanline_hook(const crt_scanline_t *scanline,
-                                    uint16_t *active_buf,
-                                    uint16_t active_width,
-                                    void *user_data)
-{
+IRAM_ATTR void crt_fb_scanline_hook(const crt_scanline_t *scanline, uint16_t *active_buf,
+                                    uint16_t active_width, void *user_data) {
     const crt_fb_surface_t *surface = (const crt_fb_surface_t *)user_data;
 
-    if (!CRT_SCANLINE_HAS_LOGICAL(scanline) ||
-        scanline->logical_line >= surface->height ||
-        surface->buffer == NULL ||
-        surface->palette == NULL) {
+    if (scanline == NULL || active_buf == NULL || active_width == 0 || surface == NULL ||
+        !CRT_SCANLINE_HAS_LOGICAL(scanline) || scanline->logical_line >= surface->height ||
+        surface->buffer == NULL || surface->palette == NULL) {
         return;
     }
 
@@ -184,9 +184,7 @@ IRAM_ATTR void crt_fb_scanline_hook(const crt_scanline_t *scanline,
 
 /* ── Compose layer adapter ────────────────────────────────────────── */
 
-IRAM_ATTR bool crt_fb_layer_fetch(void *ctx,
-                                  uint16_t logical_line,
-                                  uint8_t *idx_out,
+IRAM_ATTR bool crt_fb_layer_fetch(void *ctx, uint16_t logical_line, uint8_t *idx_out,
                                   uint16_t width)
 {
     const crt_fb_surface_t *surface = (const crt_fb_surface_t *)ctx;
@@ -194,8 +192,8 @@ IRAM_ATTR bool crt_fb_layer_fetch(void *ctx,
     if (idx_out == NULL || width == 0) {
         return false;
     }
-    if (surface == NULL || surface->buffer == NULL ||
-        logical_line >= surface->height || surface->width == 0) {
+    if (surface == NULL || surface->buffer == NULL || logical_line >= surface->height ||
+        surface->width == 0) {
         memset(idx_out, 0, width);
         return true;
     }
