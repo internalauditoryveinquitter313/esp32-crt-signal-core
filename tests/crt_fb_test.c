@@ -213,6 +213,47 @@ static void test_scanline_hook(void)
     printf("  scanline hook: OK\n");
 }
 
+static void test_rgb332_scanline_hook(void)
+{
+    crt_fb_surface_t s;
+    crt_fb_surface_init(&s, 256, 4, CRT_FB_FORMAT_INDEXED8);
+    crt_fb_surface_alloc(&s);
+    memset(crt_fb_row(&s, 2), 0xFC, 256);
+
+    crt_timing_profile_t timing;
+    memset(&timing, 0, sizeof(timing));
+    timing.standard = CRT_VIDEO_STANDARD_NTSC;
+    timing.total_lines = 262;
+    timing.active_lines = 240;
+
+    crt_scanline_t sc = {
+        .physical_line = 22,
+        .logical_line = 2,
+        .type = CRT_LINE_ACTIVE,
+        .field = 0,
+        .frame_number = 0,
+        .subcarrier_phase = 0,
+        .timing = &timing,
+    };
+
+    uint16_t active_buf[768];
+    memset(active_buf, 0, sizeof(active_buf));
+
+    crt_fb_rgb332_scanline_hook(&sc, active_buf, 768, &s);
+
+    assert(active_buf[0] == 0x3a00);
+    assert(active_buf[1] == 0x4100);
+    assert(active_buf[2] == 0x4c00);
+    assert(active_buf[3] == 0x4500);
+
+    uint16_t guard_buf[4] = {0xBEEF, 0xBEEF, 0xBEEF, 0xBEEF};
+    crt_fb_rgb332_scanline_hook(&sc, guard_buf, 4, &s);
+    assert(guard_buf[0] == 0xBEEF);
+
+    crt_fb_surface_deinit(&s);
+    printf("  RGB332 scanline hook: OK\n");
+}
+
 /* ── Main ─────────────────────────────────────────────────────────── */
 
 int main(void)
@@ -223,6 +264,7 @@ int main(void)
     test_palette_grayscale();
     test_layer_fetch_adapter();
     test_scanline_hook();
+    test_rgb332_scanline_hook();
     printf("ALL PASSED\n");
     return 0;
 }

@@ -1,5 +1,7 @@
 #include "crt_fb.h"
 
+#include "crt_composite_palette.h"
+
 #include "esp_attr.h"
 #include "esp_check.h"
 
@@ -11,12 +13,12 @@
 /* ── Lifecycle ────────────────────────────────────────────────────── */
 
 esp_err_t crt_fb_surface_init(crt_fb_surface_t *surface, uint16_t width, uint16_t height,
-                              crt_fb_format_t format) {
+                              crt_fb_format_t format)
+{
     ESP_RETURN_ON_FALSE(surface != NULL, ESP_ERR_INVALID_ARG, "crt_fb", "surface is null");
     ESP_RETURN_ON_FALSE(width > 0 && height > 0, ESP_ERR_INVALID_ARG, "crt_fb", "zero dimension");
 
-    *surface = (crt_fb_surface_t)
-    {
+    *surface = (crt_fb_surface_t){
         .width = width,
         .height = height,
         .format = format,
@@ -48,7 +50,7 @@ esp_err_t crt_fb_surface_alloc(crt_fb_surface_t *surface)
 
     surface->buffer = calloc(1, buf_size);
     ESP_RETURN_ON_FALSE(surface->buffer != NULL, ESP_ERR_NO_MEM, "crt_fb",
-                        "buffer alloc failed (%u bytes)", (unsigned) buf_size);
+                        "buffer alloc failed (%u bytes)", (unsigned)buf_size);
     surface->buffer_size = buf_size;
 
     surface->palette = calloc(palette_entries, sizeof(uint16_t));
@@ -140,15 +142,16 @@ void crt_fb_palette_init_grayscale(crt_fb_surface_t *surface, uint16_t blank_lev
         return;
     }
     for (uint16_t i = 0; i < surface->palette_size; ++i) {
-        surface->palette[i] = (uint16_t)(blank_level + (uint32_t) i * (white_level - blank_level) /
-                                         (surface->palette_size - 1));
+        surface->palette[i] = (uint16_t)(blank_level + (uint32_t)i * (white_level - blank_level) /
+                                                           (surface->palette_size - 1));
     }
 }
 
 /* ── Scanline hook ────────────────────────────────────────────────── */
 
 IRAM_ATTR void crt_fb_scanline_hook(const crt_scanline_t *scanline, uint16_t *active_buf,
-                                    uint16_t active_width, void *user_data) {
+                                    uint16_t active_width, void *user_data)
+{
     const crt_fb_surface_t *surface = (const crt_fb_surface_t *)user_data;
 
     if (scanline == NULL || active_buf == NULL || active_width == 0 || surface == NULL ||
@@ -180,6 +183,37 @@ IRAM_ATTR void crt_fb_scanline_hook(const crt_scanline_t *scanline, uint16_t *ac
     if (i < active_width) {
         active_buf[i] = pal[row[acc >> 16]];
     }
+}
+
+IRAM_ATTR void crt_fb_rgb332_scanline_hook(const crt_scanline_t *scanline, uint16_t *active_buf,
+                                           uint16_t active_width, void *user_data)
+{
+    const crt_fb_surface_t *surface = (const crt_fb_surface_t *)user_data;
+    uint8_t rgb332_row[CRT_COMPOSITE_RGB332_WIDTH];
+
+    if (scanline == NULL || active_buf == NULL ||
+        active_width != CRT_COMPOSITE_RGB332_ACTIVE_WIDTH || surface == NULL ||
+        scanline->timing == NULL || !CRT_SCANLINE_HAS_LOGICAL(scanline) ||
+        scanline->logical_line >= surface->height || surface->buffer == NULL ||
+        surface->width == 0) {
+        return;
+    }
+
+    const uint8_t *row = &surface->buffer[(size_t)scanline->logical_line * surface->width];
+    if (surface->width == CRT_COMPOSITE_RGB332_WIDTH) {
+        crt_composite_rgb332_render_256_to_768(scanline->timing->standard, scanline->physical_line,
+                                               row, active_buf);
+        return;
+    }
+
+    uint32_t step = ((uint32_t)surface->width << 16) / CRT_COMPOSITE_RGB332_WIDTH;
+    uint32_t acc = 0;
+    for (uint16_t x = 0; x < CRT_COMPOSITE_RGB332_WIDTH; ++x) {
+        rgb332_row[x] = row[acc >> 16];
+        acc += step;
+    }
+    crt_composite_rgb332_render_256_to_768(scanline->timing->standard, scanline->physical_line,
+                                           rgb332_row, active_buf);
 }
 
 /* ── Compose layer adapter ────────────────────────────────────────── */
