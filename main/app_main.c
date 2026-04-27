@@ -675,44 +675,49 @@ static void app_ir_area_sweep(void)
     app_ir_ring_set(false);
 }
 
-/* PRBS-driven CRT excitation with synchronized ADC sampling.
- * Each "bit" lights the central disk for 80 ms (white = 1) or holds it
- * black (0). After settling, mean ADC is captured. The result is a 64-bit
- * sequence and its measured response — used offline to compute the
- * impulse response of the CRT phosphor → IR ring system via cross-corr. */
+/* Gray-level PRBS: a single central disk modulated between 4 amplitude
+ * levels (0, 64, 128, 192). Each tick consumes 2 LFSR bits → 2 bits of
+ * input information without saturating the ring's photo-coupling. The
+ * non-linear pixel → fósforo → IR LED → ADC chain provides the kernel
+ * needed for reservoir computing beyond a pure linear filter. */
 static void app_ir_prbs_capture(void)
 {
-    const int kBits = 128;
+    const int kTicks = 256;
     const int kSettleMs = 50;
     const int kSampleN = 8;
-    /* 31-bit Galois LFSR seed; period 2^31-1 so 128 bits are pseudo-random. */
+    /* 4 grayscale levels — well below saturation (max 192 / 255). Empirical:
+     * with the ring on glass, level 192 gives ADC ~2400, level 64 gives
+     * ~1500, level 0 gives ~80, so the dynamic range is preserved. */
+    static const uint8_t kLevels[4] = {0, 64, 128, 192};
     uint32_t lfsr = 0xACE1u;
 
-    const float radius_mm = APP_RING_OD_MM * 0.5f;
+    /* Probe is intentionally TINY (~12 px elliptical) to keep the ring out
+     * of saturation: a full-disk pixel illumination overdrives the LEDs
+     * regardless of grayscale level. Small probe + 4 levels gives ADC
+     * dynamic range across all levels. */
     const int cx = APP_RING_CENTER_X;
     const int cy = APP_RING_CENTER_Y;
-    const int rx = (int)(radius_mm * (float)s_fb.width / APP_CRT_VISIBLE_W_MM + 0.5f);
-    const int ry = (int)(radius_mm * (float)s_fb.height / APP_CRT_VISIBLE_H_MM + 0.5f);
+    const int rx = 6;
+    const int ry = 6;
 
     gpio_set_direction(APP_IR_PIN, GPIO_MODE_INPUT);
     gpio_set_pull_mode(APP_IR_PIN, GPIO_PULLDOWN_ONLY);
     esp_rom_delay_us(500);
 
-    uint64_t bits_lo = 0; /* bits 0..63 */
-    uint64_t bits_hi = 0; /* bits 64..127 */
-    int adc_seq[128] = {0};
-    for (int i = 0; i < kBits; ++i) {
-        const uint32_t out = lfsr & 1U;
-        lfsr = (lfsr >> 1) ^ (uint32_t)((-(int32_t)(out)) & 0xA3000000u);
-        if (i < 64) {
-            bits_lo |= ((uint64_t)out) << i;
-        } else {
-            bits_hi |= ((uint64_t)out) << (i - 64);
+    static uint8_t lvl_seq[256] = {0};
+    static int adc_seq[256] = {0};
+    for (int t = 0; t < kTicks; ++t) {
+        /* Consume 2 LFSR bits to choose 1 of 4 levels. */
+        const uint8_t lvl_idx = (uint8_t)(lfsr & 0x3U);
+        for (int b = 0; b < 2; ++b) {
+            const uint32_t out = lfsr & 1U;
+            lfsr = (lfsr >> 1) ^ (uint32_t)((-(int32_t)(out)) & 0xA3000000u);
         }
+        lvl_seq[t] = lvl_idx;
 
         app_fb_fill(&s_fb, 0);
-        if (out) {
-            app_fb_fill_ellipse(&s_fb, cx, cy, rx, ry, 255);
+        if (kLevels[lvl_idx] > 0) {
+            app_fb_fill_ellipse(&s_fb, cx, cy, rx, ry, kLevels[lvl_idx]);
         }
         vTaskDelay(pdMS_TO_TICKS(kSettleMs));
         long sum = 0;
@@ -722,18 +727,23 @@ static void app_ir_prbs_capture(void)
             sum += v;
             esp_rom_delay_us(200);
         }
-        adc_seq[i] = (int)(sum / kSampleN);
+        adc_seq[t] = (int)(sum / kSampleN);
     }
 
-    ESP_LOGI("prbs", "bits_lo=0x%016llx bits_hi=0x%016llx (LSB first, 128 bits)",
-             (unsigned long long)bits_lo, (unsigned long long)bits_hi);
+    ESP_LOGI("gprbs", "ticks=%d levels=4 set=[%d,%d,%d,%d]", kTicks, kLevels[0], kLevels[1],
+             kLevels[2], kLevels[3]);
     char line[160];
-    for (int base = 0; base < kBits; base += 16) {
+    for (int base = 0; base < kTicks; base += 16) {
         int n = snprintf(line, sizeof(line), "i=%3d", base);
-        for (int i = 0; i < 16 && (base + i) < kBits; ++i) {
+        for (int i = 0; i < 16 && (base + i) < kTicks; ++i) {
+            n += snprintf(line + n, sizeof(line) - n, " %1u", lvl_seq[base + i]);
+        }
+        ESP_LOGI("gprbs_l", "%s", line);
+        n = snprintf(line, sizeof(line), "i=%3d", base);
+        for (int i = 0; i < 16 && (base + i) < kTicks; ++i) {
             n += snprintf(line + n, sizeof(line) - n, " %4d", adc_seq[base + i]);
         }
-        ESP_LOGI("prbs_csv", "%s", line);
+        ESP_LOGI("gprbs_a", "%s", line);
     }
     app_ir_ring_set(false);
 }
