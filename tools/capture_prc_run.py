@@ -127,9 +127,55 @@ def parse_run(text: str) -> dict:
             hi = int(m.group(2), 16)
             out["prbs_bits"] = lo | (hi << 64)
             continue
+        m = re.search(
+            r"prbs: bits_w0=0x([0-9a-fA-F]+)\s+bits_w1=0x([0-9a-fA-F]+)\s+"
+            r"bits_w2=0x([0-9a-fA-F]+)\s+bits_w3=0x([0-9a-fA-F]+)",
+            line,
+        )
+        if m:
+            w0 = int(m.group(1), 16)
+            w1 = int(m.group(2), 16)
+            w2 = int(m.group(3), 16)
+            w3 = int(m.group(4), 16)
+            out["prbs_bits"] = w0 | (w1 << 64) | (w2 << 128) | (w3 << 192)
+            continue
         m = re.search(r"prbs_csv: i=\s*(\d+)\s+(.+)$", line)
         if m:
             out["prbs_adc"].extend(int(v) for v in m.group(2).split())
+            continue
+
+        # Multi-input PRBS (4 quadrants)
+        m = re.search(r"mprbs: ticks=(\d+) quadrants=(\d+)", line)
+        if m:
+            out["mprbs_quadrants"] = int(m.group(2))
+            out.setdefault("mprbs_bits", [])
+            out.setdefault("mprbs_adc", [])
+            continue
+        m = re.search(r"mprbs_b: i=\s*(\d+)\s+(.+)$", line)
+        if m:
+            out.setdefault("mprbs_bits", []).extend(
+                int(v, 16) for v in m.group(2).split()
+            )
+            continue
+        m = re.search(r"mprbs_a: i=\s*(\d+)\s+(.+)$", line)
+        if m:
+            out.setdefault("mprbs_adc", []).extend(int(v) for v in m.group(2).split())
+            continue
+
+        # Gray-level PRBS (4 amplitude levels, single disk)
+        m = re.search(r"gprbs: ticks=(\d+) levels=(\d+) set=\[([^\]]+)\]", line)
+        if m:
+            out["gprbs_levels_set"] = [int(v) for v in m.group(3).split(",")]
+            out.setdefault("gprbs_lvl", [])
+            out.setdefault("gprbs_adc", [])
+            continue
+        m = re.search(r"gprbs_l: i=\s*(\d+)\s+(.+)$", line)
+        if m:
+            out.setdefault("gprbs_lvl", []).extend(int(v) for v in m.group(2).split())
+            continue
+        m = re.search(r"gprbs_a: i=\s*(\d+)\s+(.+)$", line)
+        if m:
+            out.setdefault("gprbs_adc", []).extend(int(v) for v in m.group(2).split())
             continue
 
     return out
@@ -198,6 +244,32 @@ def write_csvs(parsed: dict, outdir: Path) -> None:
             for i in range(n):
                 bit = (bits >> i) & 1
                 f.write(f"{i},{bit},{parsed['prbs_adc'][i]}\n")
+
+    # mprbs.csv (4-quadrant multi-PRBS)
+    if parsed.get("mprbs_bits") and parsed.get("mprbs_adc"):
+        bits = parsed["mprbs_bits"]
+        adcs = parsed["mprbs_adc"]
+        n = min(len(bits), len(adcs))
+        with (outdir / "mprbs.csv").open("w") as f:
+            f.write("# 4-quadrant PRBS: bits is a 4-bit nibble (q0=TL,q1=TR,q2=BL,q3=BR)\n")
+            f.write("tick,b0,b1,b2,b3,bits_hex,adc\n")
+            for i in range(n):
+                b = bits[i]
+                f.write(f"{i},{(b>>0)&1},{(b>>1)&1},{(b>>2)&1},{(b>>3)&1},{b:x},{adcs[i]}\n")
+
+    # gprbs.csv (gray-level PRBS, 4 amplitudes)
+    if parsed.get("gprbs_lvl") and parsed.get("gprbs_adc"):
+        lvls = parsed["gprbs_lvl"]
+        adcs = parsed["gprbs_adc"]
+        levels_set = parsed.get("gprbs_levels_set", [0, 64, 128, 192])
+        n = min(len(lvls), len(adcs))
+        with (outdir / "gprbs.csv").open("w") as f:
+            f.write(f"# gray-level PRBS, levels={levels_set}\n")
+            f.write("tick,lvl_idx,intensity,adc\n")
+            for i in range(n):
+                idx = lvls[i]
+                inten = levels_set[idx] if idx < len(levels_set) else idx
+                f.write(f"{i},{idx},{inten},{adcs[i]}\n")
 
 
 def analyze(parsed: dict) -> str:
